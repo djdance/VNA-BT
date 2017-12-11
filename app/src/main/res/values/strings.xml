@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">VNA-BT-TWVN</string>
+    <string name="data_blank">-</string>
+    <string name="title_section1">Monitor Data</string>
+    <string name="action_connect">Connect</string>
+
+    <string name="scanning">scanning for devices…</string>
+    <string name="select_device">select a device to connect</string>
+    <string name="none_paired">No devices have been paired</string>
+    <string name="none_found">No devices found</string>
+    <string name="title_paired_devices">Paired Devices</string>
+    <string name="title_other_devices">Other Available Devices</string>
+    <string name="button_scan">Scan for devices</string>
+    <string name="RPM">Engine RPM:</string>
+    <string name="EngineTemp">Engine Temp:</string>
+    <string name="OilPressure">Oil Pressure:</string>
+    <string name="Frames">CAN frames:</string>
+</resources>

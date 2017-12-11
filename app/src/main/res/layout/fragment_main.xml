@@ -1,0 +1,268 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools" android:layout_width="match_parent"
+    android:layout_height="match_parent" android:paddingLeft="@dimen/activity_horizontal_margin"
+    android:paddingRight="@dimen/activity_horizontal_margin"
+    android:paddingTop="@dimen/activity_vertical_margin"
+    android:paddingBottom="@dimen/activity_vertical_margin"
+    tools:context=".MainActivity$PlaceholderFragment">
+
+    <TextView android:id="@+id/section_label1" android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="J1708 TwinVision test"
+        android:textSize="30sp" />
+
+    <LinearLayout
+        android:id="@+id/section_layout1"
+        android:orientation="vertical"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/section_label1"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:layout_marginTop="10dp" >
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <ToggleButton
+                android:id="@+id/button_sendExample"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" Mute "
+                android:textOn=" Mute "
+                android:textOff=" Mute "
+                />
+            <Button
+                android:id="@+id/button_sendrs232"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" Enable RS232 " />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/button_sendDest1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" D1 " />
+            <Button
+                android:id="@+id/button_sendDest2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" D2 " />
+            <Button
+                android:id="@+id/button_sendDest3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" D3 " />
+            <Button
+                android:id="@+id/button_sendDest4"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" D4 " />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Dest: "
+                />
+            <Button
+                android:id="@+id/button_sendDestMinus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" -1 " />
+            <TextView
+                android:layout_width="150dp"
+                android:layout_height="wrap_content"
+                android:id="@+id/curDestTV"
+                android:textSize="20dp"
+                android:background="#313131"
+                android:textColor="#ffffff"
+                android:padding="3dp"
+                android:text="xxxxx" />
+            <Button
+                android:id="@+id/button_sendDestPlus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" +1 " />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Dest"
+            android:visibility="gone"
+            />
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:gravity="right"
+            android:visibility="gone"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/EditTextEmission"
+                android:layout_width="70dp"
+                android:layout_height="40dp"
+                android:ems="10"
+                android:hint="1..4 alphanumeric chars"
+                android:lines="1"
+                android:text="1"></EditText>
+
+            <Button
+                android:id="@+id/button_send"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" Send " />
+
+            <Button
+                android:id="@+id/button_sendAll"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" Enum " />
+
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:text="Route" />
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:gravity="right"
+            android:visibility="gone"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/EditTextEmission2"
+                android:layout_width="70dp"
+                android:layout_height="40dp"
+                android:ems="10"
+                android:enabled="true"
+                android:hint="Decimal less 65536"
+                android:inputType="numberDecimal"
+                android:lines="1"
+                android:text="1"></EditText>
+
+            <Button
+                android:id="@+id/button_send2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" Send " />
+
+            <Button
+                android:id="@+id/button_send2All"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" Enum " />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <TextView android:id="@+id/section_label" android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/title_section1"
+        android:layout_below="@+id/section_layout1"
+        android:visibility="gone"
+        android:textSize="30sp" />
+
+    <TextView
+        android:id="@+id/EditTextReception"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_below="@+id/section_layout1"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:gravity="bottom"
+        android:hint="Logs and reports"
+        android:isScrollContainer="true"
+        android:scrollbarStyle="insideOverlay"></TextView>
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/section_label"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:visibility="gone"
+        android:layout_marginTop="10dp" >
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:text="@string/RPM"
+            android:id="@+id/RPMLabel" />
+
+        <TextView
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:text="@string/data_blank"
+            android:id="@+id/RPMField"
+            android:layout_gravity="end"
+            android:gravity="end" />
+
+        <TextView
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:text="@string/EngineTemp"
+            android:id="@+id/CoolantTempLabel" />
+
+        <TextView
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:text="@string/data_blank"
+            android:id="@+id/CoolantTempField"
+            android:layout_gravity="end"
+            android:gravity="end" />
+
+        <TextView
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:text="@string/OilPressure"
+            android:id="@+id/OilPressureLabel" />
+
+        <TextView
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:text="@string/data_blank"
+            android:id="@+id/OilPressureField"
+            android:layout_gravity="end"
+            android:gravity="end" />
+
+        <TextView
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:text="@string/Frames"
+            android:id="@+id/CANFramesLabel" />
+
+        <TextView
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:text="@string/data_blank"
+            android:id="@+id/CANFramesField"
+            android:gravity="end" />
+
+    </LinearLayout>
+
+</RelativeLayout>
