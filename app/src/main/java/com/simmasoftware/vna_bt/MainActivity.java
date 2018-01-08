@@ -7,21 +7,26 @@
 package com.simmasoftware.vna_bt;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
-import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Message;
+import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
-import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -30,16 +35,25 @@ import android.widget.ToggleButton;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String TAG = "VNA-BT";
+    private static final String TAG = "djd";
     TextView mReception;
     private static final int REQUEST_CONNECT_DEVICE_INSECURE = 1;
+    private static final int REQUEST_ACTION_REQUEST_ENABLE_AND_CONNECT = 2;
+    private static final int REQUEST_ACTION_REQUEST_ENABLE=3;
+    private static final int REQUEST_ACTION_REQUEST_ENABLE_AND_SCAN=4;
     private static final UUID sppUUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"); //Write Characteristic: F8287520-BD28-11E4-B64D-0002A5D5C51B
     private static final byte RS232_FLAG = (byte) 0xC0;
     private static final byte RS232_ESCAPE = (byte) 0xDB;
@@ -66,6 +80,7 @@ public class MainActivity extends AppCompatActivity {
     private MenuItem connect_button = null;
     private boolean connected;
     private BluetoothSocket bluetoothSocket;
+    BluetoothAdapter bluetooth = BluetoothAdapter.getDefaultAdapter();
     private byte[] m_buffer;
     private int m_count;
     private boolean isInvalid;
@@ -73,18 +88,66 @@ public class MainActivity extends AppCompatActivity {
     private int m_size;
     private HashMap<String, String> newData;
     private HashMap<String, Integer> monitorFields;
-    int currDest=-1;
-
+    int currDest=-1,unsentDest=-1;
+    SharedPreferences prefs_default;
+    String address="", addressName="";
+    SimpleDateFormat mSDF = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+    int counter_J1708_received=0, counter_J1708_sent=0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.d(TAG, "MainActivity started, SDK=" + Build.VERSION.SDK_INT);
+        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread thread, Throwable throwable) {
+                //Log.d(TAG, "exception: " + this.getClass().getName() + ", " + throwable.toString());
+                final Writer result = new StringWriter();
+                final PrintWriter printWriter = new PrintWriter(result);
+                throwable.printStackTrace(printWriter);
+                String stacktrace = "VNA-BT: " + result.toString();
+                Log.e(TAG, "exception: " + stacktrace);
+                Intent intent = new Intent(getApplicationContext(), checkService.class);
+                intent.putExtra("postlog", stacktrace);
+                startService(intent);
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            Thread.sleep(500);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        System.exit(0);
+                        android.os.Process.killProcess(android.os.Process.myPid());
+                    }
+                }).start();
+            }
+        });
         setContentView(R.layout.activity_main);
+        prefs_default = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+        address=prefs_default.getString("address","");
+        addressName=prefs_default.getString("addressName","");
+        ((TextView) findViewById(R.id.addressName)).setText("with "+addressName);
 
-        initTextViews();
+        String versionName = "";
+        try {
+            versionName = " ver."+getApplicationContext().getPackageManager().getPackageInfo(getApplicationContext().getPackageName(), 0).versionName+"";
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.e(TAG, "Exception Version Name: " + e.getLocalizedMessage());
+        }
+        setTitle(getTitle().toString()+versionName);
 
         mReception = (TextView) findViewById(R.id.EditTextReception);
         mReception.requestFocus();
+        mReception.setMovementMethod(new ScrollingMovementMethod());
+        log("App started");
+        //if (!addressName.equals(""))
+        //    log("Last known device: "+addressName);
+
+
+
+
         ((Button) findViewById(R.id.button_send)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -115,6 +178,14 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
                 }).start();
+            }
+        });
+        ((CheckBox) findViewById(R.id.startconnectCheckbox)).setEnabled(!address.equals(""));
+        ((CheckBox) findViewById(R.id.startconnectCheckbox)).setChecked(prefs_default.getBoolean("startconnectCheckbox",false));
+        ((CheckBox) findViewById(R.id.startconnectCheckbox)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                prefs_default.edit().putBoolean("startconnectCheckbox",isChecked).commit();
             }
         });
         ((ToggleButton) findViewById(R.id.button_sendExample)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -165,11 +236,51 @@ public class MainActivity extends AppCompatActivity {
                 sendbuttonWork(-1);
             }
         });
+        ((Button) findViewById(R.id.button_sendDestLast)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                sendbuttonWork(0);
+            }
+        });
+        initTextViews();//no need
+
+        checkAndEnableBT(((CheckBox) findViewById(R.id.startconnectCheckbox)).isChecked()?REQUEST_ACTION_REQUEST_ENABLE_AND_CONNECT:REQUEST_ACTION_REQUEST_ENABLE);
+
     }
-    void log(final boolean sent, final String text){
+    boolean checkAndEnableBT(int REQUEST_ACTION){
+        boolean enabled=bluetooth.isEnabled();
+        if (!enabled) {
+            Toast.makeText(getApplicationContext(),"Turning ON Bluetooth", Toast.LENGTH_LONG);
+            log("Turning ON Bluetooth");
+            startActivityForResult(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQUEST_ACTION);
+        }
+        if (enabled && REQUEST_ACTION==REQUEST_ACTION_REQUEST_ENABLE_AND_CONNECT){
+            log("Bluetooth is active");
+            autoConnect();
+        }
+        return enabled;
+    }
+    void autoConnect(){
+        log("Will auto connect on start...");
+        Thread connectThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                connectDevice(address, 0);
+            }
+        });
+        connectThread.start();
+    }
+    void log(String text){
+        log(0,text);
+    }
+    void log(boolean sent, String text){
+        log(sent?1:-1,text);
+    }
+    void log(final int sent, final String text){
         runOnUiThread(new Runnable() {
             public void run() {
-                String ss=(sent?"sent":"rcvd")+": "+text;
+                String time111 = mSDF.format(new Date());
+                String ss=time111+" "+(sent!=0?(sent>0?"sent":"rcvd")+":":"")+" "+text;
                 mReception.append(ss+"\n");
                 if (mReception.length() > 2000)
                     mReception.setText(mReception.getText().toString().substring(mReception.length() - 2000));
@@ -198,15 +309,92 @@ public class MainActivity extends AppCompatActivity {
     void log(final boolean sent, final byte[] text){
         log(sent,text,text.length);
     }
+    @Override
+    protected void onPause() {
+        if (mHandler!=null) {
+            mHandler.removeMessages(1);
+            mHandler.removeMessages(2);
+        }
+        super.onPause();
+    }
+    private Handler mHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            if (msg.what == 1) {
+                //send to Dest and repeat if need
+                if (connected) {
+                    runOnUiThread(new Runnable() {
+                        public void run() {
+                            sendbuttonWorkDest(currDest);
+                        }
+                    });
+                    if (((CheckBox) findViewById(R.id.repeatCheckbox)).isChecked()) {
+                        int delay = 0;
+                        try {
+                            delay = Integer.parseInt(((EditText) findViewById(R.id.repeatEditText)).getText().toString());
+                        } catch (Exception e) {
+                        }
+                        if (delay <= 0)
+                            runOnUiThread(new Runnable() {
+                                public void run() {
+                                    ((CheckBox) findViewById(R.id.repeatCheckbox)).setChecked(false);
+                                }
+                            });
+                        else
+                            mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), 1000 * delay);
+                    }
+                } else {
+                    log("Not connected yet");
+                    if (((CheckBox) findViewById(R.id.startconnectCheckbox)).isChecked()){
+                        unsentDest=currDest;
+                        Thread reconnectThread = new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                reconnect();
+                            }
+                        });
+                        reconnectThread.start();
+                    }
+                }
+            } else if (msg.what==2) {
+                //send ping
+                if (connected) {
+                    toggleWork(2, false);
+                    if (((CheckBox) findViewById(R.id.pingCheckbox)).isChecked()) {
+                        int delay = 0;
+                        try {
+                            delay = Integer.parseInt(((EditText) findViewById(R.id.pingEditText)).getText().toString());
+                        } catch (Exception e) {
+                        }
+                        if (delay <= 0)
+                            runOnUiThread(new Runnable() {
+                                public void run() {
+                                    ((CheckBox) findViewById(R.id.pingCheckbox)).setChecked(false);
+                                }
+                            });
+                        else
+                            mHandler.sendMessageDelayed(Message.obtain(mHandler, 2, ""), 1000 * delay);
+                    }
+                }
+            } else if (msg.what>=3 && msg.what<=5){
+                connectDevice(address, msg.what-2);
+            } else {
+                Log.d(TAG,"handle wrong msg "+msg.what);
+            }
+        }
+    };
+
     void sendbuttonWork(int increment){
         if (currDest+increment>=0)
             currDest+=increment;
         ((TextView) findViewById(R.id.curDestTV)).setText(""+currDest);
-        sendbuttonWorkDest(currDest);
+        mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), 50);
+        //mHandler.sendMessageDelayed(Message.obtain(mHandler, 2, ""), 50);//debug!! remove in prod
     }
     void sendbuttonWorkDest(int dest){
         //get number of stored message
         //increase to 4 digits
+        Log.d(TAG,"sendbuttonWorkDest "+dest);
         String t=Integer.toHexString(dest);
         if (t.length()==1)
             t="000"+t;
@@ -256,21 +444,24 @@ public class MainActivity extends AppCompatActivity {
                 stuffed[cnt+esc_cnt] = message[cnt];
             }
         }// */
-        log(true,"Will sendCommand, length="+(cnt+esc_cnt));//+", chk="+chk);
+        //log("Will sendCommand, length="+(cnt+esc_cnt));//+", chk="+chk);
         sendCommand(new TxStruct(stuffed, cnt+esc_cnt));
+        counter_J1708_sent++;
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                updateLabels();
+            }
+        });
     }
     void toggleWork(int casse, boolean isChecked){
         byte[] message=new byte[0];
         if (casse==1) {
             //toggle rs232
             message = new byte[4];
-            byte[] stuffed = new byte[8];
-            int cnt;
-
             message[0] = 0;
             message[1] = 2;//length
             message[2] = 35;
-            //byte chk=(byte) cksum(message);;
             message[3] = (byte) cksum(message);
         }else if (casse==0) {
             //toggle VNA BT reporrt
@@ -283,7 +474,14 @@ public class MainActivity extends AppCompatActivity {
             message[5] = 0;
             message[6] = (byte) (isChecked ? 0x00 : 0x05);//toggle 1-sec report ODO and stat
             message[7] = (byte) cksum(message);
-
+        }else if (casse==2) {
+            //ping
+            message = new byte[5];
+            message[0] = 0;
+            message[1] = 3;//length
+            message[2] = ACK;
+            message[3] = 1;
+            message[4] = (byte) cksum(message);
         }
         // Tack on beginning of string marker
         byte[] stuffed = new byte[17];
@@ -325,40 +523,66 @@ public class MainActivity extends AppCompatActivity {
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_connect) {
             connect_button = item;
-
-            if(item.getTitle().toString().compareToIgnoreCase("Connect")==0)
-            {
-                // do BT connect
-                item.setTitle("Connecting...");
-                Intent serverIntent = new Intent(this, DeviceListActivity.class);
-                startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE_INSECURE);
-            }
-            else
-            {
-                disconnect();
-            }
+            menuConnectClick();
             return true;
         }
 
         return super.onOptionsItemSelected(item);
     }
 
-    public void onActivityResult(int requestCode, int resultCode, Intent data)
-    {
+    void menuConnectClick(){
+        if (checkAndEnableBT(REQUEST_ACTION_REQUEST_ENABLE_AND_SCAN)) {
+            if (connect_button.getTitle().toString().compareToIgnoreCase("Connect") == 0) {
+                // do BT connect
+                connect_button.setTitle("Connecting...");
+                log("Connecting...");
+                Intent serverIntent = new Intent(this, DeviceListActivity.class);
+                startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE_INSECURE);
+            } else {
+                disconnect();
+            }
+        }
+    }
+
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
         switch (requestCode)
         {
             case REQUEST_CONNECT_DEVICE_INSECURE:
                 // When DeviceListActivity returns with a bluetoothDevice to connect
-                if (resultCode == Activity.RESULT_OK)
-                {
-                    final String address = data.getExtras().getString(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
+                if (resultCode == Activity.RESULT_OK) {
+                    address = data.getExtras().getString(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
+                    addressName = data.getExtras().getString("addressName");
+                    prefs_default.edit().putString("address",address).commit();
+                    prefs_default.edit().putString("addressName",addressName).commit();
+                    ((CheckBox) findViewById(R.id.startconnectCheckbox)).setEnabled(!address.equals(""));
                     Thread connectThread = new Thread(new Runnable() {
                         @Override
                         public void run() {
+                            ((TextView) findViewById(R.id.addressName)).setText("with "+addressName);
                             connectDevice(address, 0);
                         }
                     });
                     connectThread.start();
+                } else {
+                    log("Failed to request BT device");
+                    if(connect_button != null) connect_button.setTitle("Connect");
+                }
+                break;
+            case REQUEST_ACTION_REQUEST_ENABLE:
+            case REQUEST_ACTION_REQUEST_ENABLE_AND_CONNECT:
+            case REQUEST_ACTION_REQUEST_ENABLE_AND_SCAN:
+                //turning ON bt
+                //Log.d(TAG,"onActivityResult: for REQUEST_ACTION_REQUEST_ENABLE_AND_CONNECT: resultCode="+resultCode);
+                if (resultCode == Activity.RESULT_OK){
+                    if (requestCode==REQUEST_ACTION_REQUEST_ENABLE_AND_CONNECT){
+                        log("Bluetooth is active");
+                        autoConnect();
+                    }
+                    if (requestCode==REQUEST_ACTION_REQUEST_ENABLE_AND_SCAN){
+                        menuConnectClick();
+                    }
+                }else {
+                    log("Failed to turn on BT");
                 }
                 break;
         }
@@ -367,7 +591,6 @@ public class MainActivity extends AppCompatActivity {
     private void initTextViews() {
         newData = new HashMap<>();
         monitorFields = new HashMap<>();
-
         newData.put("RPM", "");
         monitorFields.put("RPM", R.id.RPMField);
         newData.put("Coolant", "");
@@ -387,14 +610,12 @@ public class MainActivity extends AppCompatActivity {
     };
     private Thread readThread;
 
-    private BluetoothSocket connectDevice(String address, int i)
-    {
+    private BluetoothSocket connectDevice(final String address, int i) {
         // Get the BluetoothDevice object
 
-        BluetoothDevice bluetoothDevice = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(address);
         connected = false;
-        try
-        {
+        try{
+            BluetoothDevice bluetoothDevice = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(address);
             bluetoothSocket = bluetoothDevice.createRfcommSocketToServiceRecord(sppUUID);
             bluetoothSocket.connect();
 
@@ -402,6 +623,7 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void run() {
                     Toast.makeText(getApplicationContext(), "Connected!", Toast.LENGTH_SHORT).show();
+                    log("Connected with "+addressName);
                     if (connect_button != null) connect_button.setTitle("Disconnect");
                     newData.put("Frames", "-");
                     updateLabels();
@@ -417,22 +639,26 @@ public class MainActivity extends AppCompatActivity {
                 readThread.setPriority(4);
                 readThread.start();
             }
+            if (unsentDest>=0) {
+                currDest=unsentDest;
+                unsentDest=-1;
+                mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), 100);
+            }
 
-        }
-        catch (Exception ioex)
-        {
-            Log.e(TAG, "", ioex);
+        } catch (Exception ioex){
+            log("BT error: "+ioex.toString().substring(20));
         }
 
-        if (!connected)
-        {
-            if(i<2){
-                connectDevice(address, i+1);
+        if (!connected){
+            if(i<3){
+                log("will try one more time...("+i+")");
+                mHandler.sendMessageDelayed(Message.obtain(mHandler, 3+i, ""), 1000 );
             } else {
                 this.runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(getApplicationContext(), "Bluetooth connection error, try again", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getApplicationContext(), "Bluetooth connection error", Toast.LENGTH_SHORT).show();
+                        log("Failed "+addressName+", is it active?");
                         if (connect_button != null) connect_button.setTitle("Connect");
                         disconnect();
                     }
@@ -445,40 +671,30 @@ public class MainActivity extends AppCompatActivity {
 
 
     private void reconnect() {
+        log("Bluetooth reconnection...");
         if(bluetoothSocket != null) {
-            String address = bluetoothSocket.getRemoteDevice().getAddress();
-            connected = false;
             try {
                 bluetoothSocket.close();
-            } catch (IOException e) { /* That's really too bad. */ }
-            connectDevice(address, 1);
-        } else {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    Toast.makeText(getApplicationContext(),
-                            "Bluetooth connection lost. Please reconnect.",
-                            Toast.LENGTH_LONG).show();
-                }
-            });
+            } catch (IOException e) { }
         }
+        connectDevice(address, 1);
     }
 
     private void disconnect() {
-        try
-        {
+        try {
             if(readThread != null) readThread.interrupt();
             if (bluetoothSocket != null)
             {
                 bluetoothSocket.close();
                 bluetoothSocket = null;
             }
-        }
-        catch (IOException e)
-        {
+            mHandler.removeMessages(2);
+        } catch (IOException e) {
             /* We don't really care about the reconnect exceptions */
-            Log.e(TAG, "In reconnect", e);
+            //Log.e(TAG, "In reconnect", e);
         }
+        if (connected)
+            log("Disconnected");
         connected = false;
         if(connect_button != null) connect_button.setTitle("Connect");
     }
@@ -578,10 +794,13 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                     //Have we received the entire message? If so, is it valid?
-                    if (m_count == m_size && val == cksum(m_buffer, m_count -1)) {
-                        m_count--; //Ignore the checksum at the end of the message
-                        processPacket(m_buffer);
-                    }
+                    if (m_count == m_size)
+                        if (val == cksum(m_buffer, m_count -1)) {
+                            m_count--; //Ignore the checksum at the end of the message
+                            processPacket(m_buffer);
+                        } else {
+                            log("Received data is invalid");
+                        }
                 }
             }
         } catch (Exception e) {
@@ -591,7 +810,18 @@ public class MainActivity extends AppCompatActivity {
 
     private void processPacket(byte[] packet) {
         int msgID = packet[2];
-        if (msgID == RX_J1939) {
+        if (msgID == ACK) {
+            int id=packet[3];
+            if (id==TX_J1708){
+                counter_J1708_received++;
+                this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        updateLabels();
+                    }
+                });
+            }
+        } else if (msgID == RX_J1939) {
             final Integer pgn = ((packet[4] & 0xFF) << 16) | ((packet[5] & 0xFF) << 8) | (packet[6] & 0xFF);
             Double d;
             Integer i;
@@ -634,6 +864,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateLabels() {
+        ((TextView) findViewById(R.id.lostCounter)).setText("Lost "+(100-Math.round(100*counter_J1708_received/counter_J1708_sent))+"%");
+        /*
         for(Fragment f : getSupportFragmentManager().getFragments()) {
             if(f != null && f.getClass().equals(MainActivityFragment.class)) {
                 for (Map.Entry<String, Integer> entry : monitorFields.entrySet()) {
@@ -646,27 +878,32 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             }
-        }
+        }*/
     }
 
-    private void sendCommand(TxStruct command)
-    {
+    private void sendCommand(TxStruct command) {
         String prefix = "";
-        log(true,command.getBuf(),command.getLen());
-        if (bluetoothSocket != null)
-        {
-            try
-            {
+        log(true,command.getBuf(),Math.min(command.getLen(),20));
+        if (bluetoothSocket != null) {
+            try {
                 bluetoothSocket.getOutputStream().write(command.getBuf(),0,command.getLen());
+            }catch (IOException e){
+                log("error! BT output socket closed");
+                if (((CheckBox) findViewById(R.id.reconnectCheckbox)).isChecked()) {
+                    log("Will try to auto reconnect...");
+                    //reconnect();//crash
+                    Thread connectThread = new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            connectDevice(address, 0);
+                        }
+                    });
+                    connectThread.start();
+                }
             }
-            catch (IOException e)
-            {
-                log(true, "error! BT output socket closed");
-            }
-        }
-        else
-        {
-            log(true,"error! No BT connected");
+        } else {
+            log("error! No BT connected");
+            log("PLEASE REPORT IN THIS CASE! Will add BT reconnecting and here!");
             disconnect();
         }
     }

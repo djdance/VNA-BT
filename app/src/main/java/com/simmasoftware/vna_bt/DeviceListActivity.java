@@ -46,7 +46,7 @@ import java.util.Set;
 public class DeviceListActivity extends Activity
 {
     // Debugging
-    private static final String TAG = "DeviceListActivity";
+    private static final String TAG = "djd";
     private static final boolean D = true;
 
     // Return Intent extra
@@ -175,11 +175,14 @@ public class DeviceListActivity extends Activity
 
             // Get the device MAC address, which is the last 17 chars in the View
             String info = ((TextView) v).getText().toString();
+            Log.d(TAG,"DeviceListActivity: "+info);
             String address = info.substring(info.length() - 17);
+            info=info.substring(0,info.length()-18);
 
             // Create the result Intent and include the MAC address
             Intent intent = new Intent();
             intent.putExtra(EXTRA_DEVICE_ADDRESS, address);
+            intent.putExtra("addressName", info);
 
             // Set result and finish this Activity
             setResult(Activity.RESULT_OK, intent);

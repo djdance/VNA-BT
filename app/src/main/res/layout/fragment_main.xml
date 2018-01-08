@@ -1,47 +1,95 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools" android:layout_width="match_parent"
-    android:layout_height="match_parent" android:paddingLeft="@dimen/activity_horizontal_margin"
-    android:paddingRight="@dimen/activity_horizontal_margin"
-    android:paddingTop="@dimen/activity_vertical_margin"
-    android:paddingBottom="@dimen/activity_vertical_margin"
+    android:layout_height="match_parent"
+    android:paddingLeft="5dp"
     tools:context=".MainActivity$PlaceholderFragment">
-
-    <TextView android:id="@+id/section_label1" android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="J1708 TwinVision test"
-        android:textSize="30sp" />
 
     <LinearLayout
         android:id="@+id/section_layout1"
         android:orientation="vertical"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/section_label1"
+        android:background="#eeeeee"
         android:layout_alignParentLeft="true"
-        android:layout_alignParentStart="true"
-        android:layout_marginTop="10dp" >
+        android:layout_alignParentStart="true">
 
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <ToggleButton
-                android:id="@+id/button_sendExample"
+            android:orientation="vertical">
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text=" Mute "
-                android:textOn=" Mute "
-                android:textOff=" Mute "
-                />
-            <Button
-                android:id="@+id/button_sendrs232"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text=" Enable RS232 " />
+                android:orientation="horizontal">
+                <CheckBox
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Connect"
+                    android:checked="false"
+                    android:enabled="false"
+                    android:id="@+id/startconnectCheckbox"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="5dp"
+                    android:lines="1"
+                    android:id="@+id/addressName"/>
+                <CheckBox
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Reconnect"
+                    android:checked="true"
+                    android:id="@+id/reconnectCheckbox"/>
+            </LinearLayout>
         </LinearLayout>
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <CheckBox
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Ping"
+                android:checked="true"
+                android:id="@+id/pingCheckbox"/>
+            <EditText
+                android:layout_width="30dp"
+                android:layout_height="wrap_content"
+                android:text="10"
+                android:inputType="number"
+                android:id="@+id/pingEditText"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="sec."
+                />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="5dp"
+                android:orientation="horizontal">
+                <CheckBox
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Repeat Dest"
+                    android:id="@+id/repeatCheckbox"/>
+                <EditText
+                    android:layout_width="30dp"
+                    android:layout_height="wrap_content"
+                    android:text="3"
+                    android:inputType="number"
+                    android:id="@+id/repeatEditText"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="sec. "
+                    />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
             android:orientation="horizontal">
             <Button
                 android:id="@+id/button_sendDest1"
@@ -71,28 +119,63 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:textColor="#000000"
                 android:text="Dest: "
                 />
             <Button
                 android:id="@+id/button_sendDestMinus"
-                android:layout_width="wrap_content"
+                android:layout_width="50dp"
                 android:layout_height="wrap_content"
+                android:textStyle="bold"
                 android:text=" -1 " />
             <TextView
-                android:layout_width="150dp"
+                android:layout_width="55dp"
                 android:layout_height="wrap_content"
                 android:id="@+id/curDestTV"
                 android:textSize="20dp"
                 android:background="#313131"
                 android:textColor="#ffffff"
                 android:padding="3dp"
-                android:text="xxxxx" />
+                android:text="xxxx" />
             <Button
                 android:id="@+id/button_sendDestPlus"
+                android:layout_width="50dp"
+                android:layout_height="wrap_content"
+                android:textStyle="bold"
+                android:text=" +1 " />
+            <Button
+                android:id="@+id/button_sendDestLast"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text=" +1 " />
+                android:textStyle="bold"
+                android:text="Send" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/lostCounter"
+                android:text=""
+                />
         </LinearLayout>
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <ToggleButton
+                android:id="@+id/button_sendExample"
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:text=" Mute autoreports "
+                android:textOn=" Mute autoreports "
+                android:textOff=" Mute autoreports "
+                />
+            <Button
+                android:id="@+id/button_sendrs232"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" Enable RS232 D9"
+                android:visibility="gone"/>
+        </LinearLayout>
+
 
         <TextView
             android:layout_width="wrap_content"
@@ -180,15 +263,14 @@
     <TextView
         android:id="@+id/EditTextReception"
         android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:layout_alignParentBottom="true"
         android:layout_below="@+id/section_layout1"
         android:focusable="true"
         android:focusableInTouchMode="true"
         android:gravity="bottom"
         android:hint="Logs and reports"
-        android:isScrollContainer="true"
-        android:scrollbarStyle="insideOverlay"></TextView>
+        android:scrollbars = "vertical"></TextView>
 
     <LinearLayout
         android:orientation="vertical"

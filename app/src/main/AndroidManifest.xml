@@ -3,6 +3,8 @@
     package="com.simmasoftware.vna_bt" >
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
         android:allowBackup="true"
@@ -22,6 +24,10 @@
             android:name=".DeviceListActivity"
             android:label="@string/select_device"
             android:theme="@android:style/Theme.Dialog" />
+        <service android:name=".checkService"
+            android:launchMode="singleTask"
+            android:process=":newprocIntentSendC">
+        </service>
     </application>
 
 </manifest>
