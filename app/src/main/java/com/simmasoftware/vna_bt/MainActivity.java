@@ -98,10 +98,12 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Log.d(TAG, "MainActivity started, SDK=" + Build.VERSION.SDK_INT);
+        prefs_default = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
         Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(Thread thread, Throwable throwable) {
                 //Log.d(TAG, "exception: " + this.getClass().getName() + ", " + throwable.toString());
+                prefs_default.edit().putBoolean("crashed",true).apply();
                 final Writer result = new StringWriter();
                 final PrintWriter printWriter = new PrintWriter(result);
                 throwable.printStackTrace(printWriter);
@@ -121,11 +123,12 @@ public class MainActivity extends AppCompatActivity {
                         System.exit(0);
                         android.os.Process.killProcess(android.os.Process.myPid());
                     }
-                }).start();
+                }).start();// */
+                //System.exit(0);
+                //android.os.Process.killProcess(android.os.Process.myPid());
             }
         });
         setContentView(R.layout.activity_main);
-        prefs_default = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
         address=prefs_default.getString("address","");
         addressName=prefs_default.getString("addressName","");
         ((TextView) findViewById(R.id.addressName)).setText("with "+addressName);
@@ -142,6 +145,11 @@ public class MainActivity extends AppCompatActivity {
         mReception.requestFocus();
         mReception.setMovementMethod(new ScrollingMovementMethod());
         log("App started");
+        boolean restoredAfterCrash=prefs_default.getBoolean("crashed",false);
+        if (restoredAfterCrash) {
+            log("Restored after crash. Logs will be sent from "+postlog.crashlogsfilename);
+            prefs_default.edit().putBoolean("crashed",false).apply();
+        }
         //if (!addressName.equals(""))
         //    log("Last known device: "+addressName);
 
@@ -244,8 +252,22 @@ public class MainActivity extends AppCompatActivity {
         });
         initTextViews();//no need
 
-        checkAndEnableBT(((CheckBox) findViewById(R.id.startconnectCheckbox)).isChecked()?REQUEST_ACTION_REQUEST_ENABLE_AND_CONNECT:REQUEST_ACTION_REQUEST_ENABLE);
+        if (!restoredAfterCrash) {
+            //String ss = null; Log.d(TAG, ss.substring(5));//emulate crash
+            checkAndEnableBT(((CheckBox) findViewById(R.id.startconnectCheckbox)).isChecked() ? REQUEST_ACTION_REQUEST_ENABLE_AND_CONNECT : REQUEST_ACTION_REQUEST_ENABLE);
+        }
 
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                (new postlog(MainActivity.this)).sendlogs();
+            }
+        }).start();
     }
     boolean checkAndEnableBT(int REQUEST_ACTION){
         boolean enabled=bluetooth.isEnabled();
@@ -555,10 +577,15 @@ public class MainActivity extends AppCompatActivity {
                     prefs_default.edit().putString("address",address).commit();
                     prefs_default.edit().putString("addressName",addressName).commit();
                     ((CheckBox) findViewById(R.id.startconnectCheckbox)).setEnabled(!address.equals(""));
-                    Thread connectThread = new Thread(new Runnable() {
+                    this.runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
                             ((TextView) findViewById(R.id.addressName)).setText("with "+addressName);
+                        }
+                    });
+                    Thread connectThread = new Thread(new Runnable() {
+                        @Override
+                        public void run() {
                             connectDevice(address, 0);
                         }
                     });

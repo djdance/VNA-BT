@@ -17,11 +17,11 @@ public class checkService extends Service {
 
     public void onCreate() {
         super.onCreate();
-        Log.d(TAG, "GO checkService started");
+        Log.d(TAG, "VNA-BT checkService started");
         postlog=new postlog(this);
 
         //NotificationManager nm= (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        Notification notif = new Notification(R.mipmap.ic_launcher, "VNA-BT Crash Helper", System.currentTimeMillis());
+        Notification notif = new Notification(R.drawable.ico, "VNA-BT Crash Helper", System.currentTimeMillis());
         Intent intentMain = new Intent(this, MainActivity.class);
         intentMain.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
         intentMain.putExtra("fromCheckService",true);
@@ -36,8 +36,8 @@ public class checkService extends Service {
     }
 
     public int onStartCommand(Intent intent, int flags, int startId) {
-        //Log.d(TAG, "checkService onStartCommand");
         String s=intent.getStringExtra("postlog");
+        Log.d(TAG, "VNA-BT checkService onStartCommand: s="+s);
         if (s!=null && !s.equalsIgnoreCase("")){
             postlog.post(s);
             new Thread(new Runnable() {
@@ -54,13 +54,11 @@ public class checkService extends Service {
                     i.setAction(Intent.ACTION_MAIN);
                     i.addCategory(Intent.CATEGORY_LAUNCHER);
                     i.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY);
-                    i.setComponent(new ComponentName(getApplicationContext().getPackageName(), main.class.getName()));
+                    i.setComponent(new ComponentName(getApplicationContext().getPackageName(), MainActivity.class.getName()));
+                    i.putExtra("fromCheckService",true);//doesn't work
 
-                    //Intent intent = new Intent(getActivity(), login.class);
-                    //intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    //Log.d(TAG,"watchdog runs Passio.... and continue?"+prefs_default.getBoolean("watchdog",false));
-                    if (!BuildConfig.DEBUG)
-                        startActivity(i);
+                    //if (!BuildConfig.DEBUG)
+                    //    startActivity(i);
 
                     //postlog.sendlogs(); //will send in main
                     try {
@@ -69,6 +67,7 @@ public class checkService extends Service {
                         Log.d(TAG, "InterruptedException TimeUnit");
                         e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
                     }
+                    postlog.sendlogs();
                     stopSelf();
                 }
             }).start();

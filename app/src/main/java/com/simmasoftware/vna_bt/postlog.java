@@ -24,7 +24,7 @@ public class postlog {
     Context context;
     int counter=0;
     String versionName= "unknown";
-    String crashlogsfilename= Environment.getExternalStorageDirectory()+"/passio_crash_logs/";
+    public static String crashlogsfilename= Environment.getExternalStorageDirectory()+"/VNABT_crash_logs/";
     final SimpleDateFormat _sdfWatchUID = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 
     public postlog(Context context){
@@ -48,8 +48,8 @@ public class postlog {
             new Thread(new Runnable() {
                 public void run() {
                     final String s="MODEL="+ URLEncoder.encode(Build.BRAND+" "+ Build.MODEL)+"&msg="+ URLEncoder.encode(_sdfWatchUID.format(new Date())+" "+msg)+"&counter="+counter
-                    +"&version=GO"+ URLEncoder.encode(versionName+",SDK"+ Build.VERSION.SDK_INT);
-
+                    +"&version=VNABT"+ URLEncoder.encode(versionName+",SDK"+ Build.VERSION.SDK_INT);
+                    Log.d("djd", "postlog saving "+s);
                     try {
                         final PrintWriter pw = new PrintWriter(new FileWriter(crashlogsfilename+ System.currentTimeMillis()+".txt", true));
                         pw.append(s);
@@ -74,12 +74,12 @@ public class postlog {
             };
             String[] fList = path.list(filter);
             if (fList!=null && fList.length>0)
-            for (int i = 0; i < fList.length && i<10; i++) {
+            for (int i = 0; i < fList.length && i<50; i++) {
                 File file=null;
                 BufferedReader br=null;
                 try {
                     final String fs=crashlogsfilename+fList[i];
-                    //Log.d("djd","postlog, sendlogs, file["+i+"]="+fs);
+                    Log.d("djd","postlog, sendlogs, file["+i+"]="+fs);
                     file=new File(fs);
                     br = new BufferedReader(new FileReader(file));
                     String line;

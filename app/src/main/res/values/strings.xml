@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">VNA-BT-TWVN</string>
+    <string name="app_name">VNA-BT TWVN</string>
     <string name="data_blank">-</string>
     <string name="title_section1">Monitor Data</string>
     <string name="action_connect">Connect</string>
