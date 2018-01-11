@@ -22,6 +22,7 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -93,6 +94,7 @@ public class MainActivity extends AppCompatActivity {
     String address="", addressName="";
     SimpleDateFormat mSDF = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
     int counter_J1708_received=0, counter_J1708_sent=0;
+    boolean firstPing=true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -196,6 +198,71 @@ public class MainActivity extends AppCompatActivity {
                 prefs_default.edit().putBoolean("startconnectCheckbox",isChecked).commit();
             }
         });
+        ((CheckBox) findViewById(R.id.reconnectCheckbox)).setChecked(prefs_default.getBoolean("reconnectCheckbox",true));
+        ((CheckBox) findViewById(R.id.reconnectCheckbox)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                prefs_default.edit().putBoolean("reconnectCheckbox",isChecked).commit();
+            }
+        });
+
+        ((CheckBox) findViewById(R.id.resendUnsent)).setChecked(prefs_default.getBoolean("resendUnsent",false));
+        ((CheckBox) findViewById(R.id.resendUnsent)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                prefs_default.edit().putBoolean("resendUnsent",isChecked).commit();
+            }
+        });
+        ((EditText) findViewById(R.id.resentUnsentEditText)).setText(prefs_default.getString("resentUnsentEditText","2"));
+        ((EditText) findViewById(R.id.resentUnsentEditText)).setOnKeyListener(new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                prefs_default.edit().putString("resentUnsentEditText",((EditText) findViewById(R.id.resentUnsentEditText)).getText().toString()).commit();
+                return false;
+            }
+        });
+
+        ((CheckBox) findViewById(R.id.pingCheckbox)).setChecked(prefs_default.getBoolean("pingCheckbox",true));
+        ((CheckBox) findViewById(R.id.pingCheckbox)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                prefs_default.edit().putBoolean("pingCheckbox",isChecked).commit();
+            }
+        });
+        ((EditText) findViewById(R.id.pingEditText)).setText(prefs_default.getString("pingEditText","10"));
+        ((EditText) findViewById(R.id.pingEditText)).setOnKeyListener(new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                prefs_default.edit().putString("pingEditText",((EditText) findViewById(R.id.pingEditText)).getText().toString()).commit();
+                return false;
+            }
+        });
+        ((EditText) findViewById(R.id.pingByDestEditText)).setText(prefs_default.getString("pingByDestEditText","0"));
+        ((EditText) findViewById(R.id.pingByDestEditText)).setOnKeyListener(new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                prefs_default.edit().putString("pingByDestEditText",((EditText) findViewById(R.id.pingByDestEditText)).getText().toString()).commit();
+                return false;
+            }
+        });
+
+        ((CheckBox) findViewById(R.id.repeatCheckbox)).setChecked(prefs_default.getBoolean("repeatCheckbox",false));
+        ((CheckBox) findViewById(R.id.repeatCheckbox)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                prefs_default.edit().putBoolean("repeatCheckbox",isChecked).commit();
+            }
+        });
+        ((EditText) findViewById(R.id.repeatEditText)).setText(prefs_default.getString("repeatEditText","3"));
+        ((EditText) findViewById(R.id.repeatEditText)).setOnKeyListener(new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                prefs_default.edit().putString("repeatEditText",((EditText) findViewById(R.id.repeatEditText)).getText().toString()).commit();
+                return false;
+            }
+        });
+
+
         ((ToggleButton) findViewById(R.id.button_sendExample)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -339,17 +406,28 @@ public class MainActivity extends AppCompatActivity {
         }
         super.onPause();
     }
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (firstPing)
+            mHandler.sendMessageDelayed(Message.obtain(mHandler, 2, ""), 2000);
+        firstPing=false;
+    }
     private Handler mHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             if (msg.what == 1) {
                 //send to Dest and repeat if need
+                mHandler.removeMessages(2);
+                if (((CheckBox)findViewById(R.id.resendUnsent)).isChecked())
+                    unsentDest=currDest;
                 if (connected) {
-                    runOnUiThread(new Runnable() {
+                    sendbuttonWorkDest(currDest);
+                    /*runOnUiThread(new Runnable() {
                         public void run() {
                             sendbuttonWorkDest(currDest);
                         }
-                    });
+                    });*/
                     if (((CheckBox) findViewById(R.id.repeatCheckbox)).isChecked()) {
                         int delay = 0;
                         try {
@@ -368,7 +446,6 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     log("Not connected yet");
                     if (((CheckBox) findViewById(R.id.startconnectCheckbox)).isChecked()){
-                        unsentDest=currDest;
                         Thread reconnectThread = new Thread(new Runnable() {
                             @Override
                             public void run() {
@@ -381,12 +458,26 @@ public class MainActivity extends AppCompatActivity {
             } else if (msg.what==2) {
                 //send ping
                 if (connected) {
-                    toggleWork(2, false);
+                    log(true,"Start ping");
+                    int desst=0;
+                    try {
+                        desst = Integer.parseInt(((EditText) findViewById(R.id.pingByDestEditText)).getText().toString());
+                    } catch (Exception e) {
+                        desst=-1;
+                        log("No Dest, will ping by ACK");
+                    }
+                    if (desst<0)
+                        toggleWork(2, false);
+                    else
+                        sendbuttonWorkDest(desst);
+
+                    //and repeat
                     if (((CheckBox) findViewById(R.id.pingCheckbox)).isChecked()) {
-                        int delay = 0;
+                        int delay = 7;
                         try {
                             delay = Integer.parseInt(((EditText) findViewById(R.id.pingEditText)).getText().toString());
                         } catch (Exception e) {
+                            log("Wrong ping delay value!");
                         }
                         if (delay <= 0)
                             runOnUiThread(new Runnable() {
@@ -411,7 +502,6 @@ public class MainActivity extends AppCompatActivity {
             currDest+=increment;
         ((TextView) findViewById(R.id.curDestTV)).setText(""+currDest);
         mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), 50);
-        //mHandler.sendMessageDelayed(Message.obtain(mHandler, 2, ""), 50);//debug!! remove in prod
     }
     void sendbuttonWorkDest(int dest){
         //get number of stored message
@@ -667,9 +757,21 @@ public class MainActivity extends AppCompatActivity {
                 readThread.start();
             }
             if (unsentDest>=0) {
+                this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        log("Will retry unsent "+unsentDest+" in "+((EditText)findViewById(R.id.resentUnsentEditText)).getText().toString()+" sec");
+                    }
+                });
                 currDest=unsentDest;
                 unsentDest=-1;
-                mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), 100);
+                int delay=500;
+                try {
+                    delay=Integer.parseInt(((EditText)findViewById(R.id.resentUnsentEditText)).getText().toString());
+                } catch (NumberFormatException e) {
+                    log("Wrong value for delay!");
+                }
+                mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), delay*1000);
             }
 
         } catch (Exception ioex){
@@ -891,7 +993,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateLabels() {
-        ((TextView) findViewById(R.id.lostCounter)).setText("Lost "+(100-Math.round(100*counter_J1708_received/counter_J1708_sent))+"%");
+        ((TextView) findViewById(R.id.lostCounter)).setText(counter_J1708_sent>0?"Lost "+(100-Math.round(100*counter_J1708_received/counter_J1708_sent))+"%":"");
         /*
         for(Fragment f : getSupportFragmentManager().getFragments()) {
             if(f != null && f.getClass().equals(MainActivityFragment.class)) {
@@ -914,6 +1016,7 @@ public class MainActivity extends AppCompatActivity {
         if (bluetoothSocket != null) {
             try {
                 bluetoothSocket.getOutputStream().write(command.getBuf(),0,command.getLen());
+                unsentDest=-1;
             }catch (IOException e){
                 log("error! BT output socket closed");
                 if (((CheckBox) findViewById(R.id.reconnectCheckbox)).isChecked()) {

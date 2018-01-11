@@ -49,7 +49,7 @@
             <CheckBox
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Ping"
+                android:text="Start ping every "
                 android:checked="true"
                 android:id="@+id/pingCheckbox"/>
             <EditText
@@ -61,30 +61,42 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="sec."
+                android:text="sec by Dest "
                 />
-            <LinearLayout
-                android:layout_width="match_parent"
+            <EditText
+                android:layout_width="30dp"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="5dp"
-                android:orientation="horizontal">
-                <CheckBox
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Repeat Dest"
-                    android:id="@+id/repeatCheckbox"/>
-                <EditText
-                    android:layout_width="30dp"
-                    android:layout_height="wrap_content"
-                    android:text="3"
-                    android:inputType="number"
-                    android:id="@+id/repeatEditText"/>
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="sec. "
-                    />
-            </LinearLayout>
+                android:text="0"
+                android:inputType="number"
+                android:id="@+id/pingByDestEditText"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="or ACK if empty"
+                android:lines="1"
+                />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <CheckBox
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Resend unsent. Delay "
+                android:checked="false"
+                android:id="@+id/resendUnsent"/>
+            <EditText
+                android:layout_width="30dp"
+                android:layout_height="wrap_content"
+                android:text="2"
+                android:inputType="number"
+                android:id="@+id/resentUnsentEditText"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="sec after restart"
+                />
         </LinearLayout>
         <LinearLayout
             android:layout_width="match_parent"
@@ -111,6 +123,27 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text=" D4 " />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <CheckBox
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Repeat Dest every "
+                android:id="@+id/repeatCheckbox"/>
+            <EditText
+                android:layout_width="30dp"
+                android:layout_height="wrap_content"
+                android:text="3"
+                android:inputType="number"
+                android:id="@+id/repeatEditText"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="sec. And stop to ping"
+                />
         </LinearLayout>
         <LinearLayout
             android:layout_width="match_parent"
