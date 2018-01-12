@@ -42,13 +42,13 @@ public class postlog {
         }
     }
 
-    public void post(final String msg){
+    public void post(final String msg, final boolean andSend) {
         if (msg!=null && !msg.equalsIgnoreCase("")){
             counter++;
             new Thread(new Runnable() {
                 public void run() {
                     final String s="MODEL="+ URLEncoder.encode(Build.BRAND+" "+ Build.MODEL)+"&msg="+ URLEncoder.encode(_sdfWatchUID.format(new Date())+" "+msg)+"&counter="+counter
-                    +"&version=VNABT"+ URLEncoder.encode(versionName+",SDK"+ Build.VERSION.SDK_INT);
+                            +"&version=VNABT"+ URLEncoder.encode(versionName+",SDK"+ Build.VERSION.SDK_INT);
                     Log.d("djd", "postlog saving "+s);
                     try {
                         final PrintWriter pw = new PrintWriter(new FileWriter(crashlogsfilename+ System.currentTimeMillis()+".txt", true));
@@ -58,9 +58,14 @@ public class postlog {
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
+                    if (andSend)
+                        sendlogs();
                 }
             }).start();
         }
+    }
+    public void post(final String msg){
+        post(msg,false);
     }
 
     public void sendlogs(){
@@ -77,6 +82,7 @@ public class postlog {
             for (int i = 0; i < fList.length && i<50; i++) {
                 File file=null;
                 BufferedReader br=null;
+                boolean dontsdelete=false;
                 try {
                     final String fs=crashlogsfilename+fList[i];
                     Log.d("djd","postlog, sendlogs, file["+i+"]="+fs);
@@ -102,13 +108,17 @@ public class postlog {
                         }
                     }
                 } catch (Exception e) {
+                    if (e!=null && e.toString().contains("resolve")){
+                        dontsdelete=true;
+                    }
                     Log.e("djd","postLog Exception e="+e.toString());
                 }// */
-                try {
-                    file.delete();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+                if (!dontsdelete)
+                    try {
+                        file.delete();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 try {
                     br.close() ;
                 } catch (IOException e) {

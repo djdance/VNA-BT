@@ -10,9 +10,12 @@ import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Message;
@@ -262,6 +265,17 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        ((Button) findViewById(R.id.button_sendLogs)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!isOnline()){
+                    Toast.makeText(getApplicationContext(),"No internet", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                (new postlog(MainActivity.this)).post(mReception.getText().toString(),true);
+                mReception.setText("log sent\n");
+            }
+        });
 
         ((ToggleButton) findViewById(R.id.button_sendExample)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -380,7 +394,8 @@ public class MainActivity extends AppCompatActivity {
     void log(final boolean sent, final byte[] text, final int len){
         runOnUiThread(new Runnable() {
             public void run() {
-                String ss=(sent?"sent":"rcvd")+": ";
+                String time111 = mSDF.format(new Date());
+                String ss=time111+" "+(sent?"sent":"rcvd")+": ";
                 for (int i = 0; i < len; i++) {
                     String h=Integer.toHexString((int)(text[i] & 0xFF));
                     if (h.length()==1)
@@ -1221,6 +1236,13 @@ PGN (Parameter Group Number) — номер группы параметров, �
         }
     }
 
-
+    public boolean isOnline() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo netInfo = cm.getActiveNetworkInfo();
+        if (netInfo != null && netInfo.isConnected()) {
+            return true;
+        }
+        return false;
+    }
 
 }

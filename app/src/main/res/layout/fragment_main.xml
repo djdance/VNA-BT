@@ -196,7 +196,7 @@
             <ToggleButton
                 android:id="@+id/button_sendExample"
                 android:layout_width="wrap_content"
-                android:layout_height="30dp"
+                android:layout_height="35dp"
                 android:text=" Mute autoreports "
                 android:textOn=" Mute autoreports "
                 android:textOff=" Mute autoreports "
@@ -207,6 +207,11 @@
                 android:layout_height="wrap_content"
                 android:text=" Enable RS232 D9"
                 android:visibility="gone"/>
+            <Button
+                android:id="@+id/button_sendLogs"
+                android:layout_width="wrap_content"
+                android:layout_height="35dp"
+                android:text="send log to server"/>
         </LinearLayout>
 
 
@@ -303,7 +308,8 @@
         android:focusableInTouchMode="true"
         android:gravity="bottom"
         android:hint="Logs and reports"
-        android:scrollbars = "vertical"></TextView>
+        android:scrollbars="vertical"
+        android:textSize="10sp"></TextView>
 
     <LinearLayout
         android:orientation="vertical"
