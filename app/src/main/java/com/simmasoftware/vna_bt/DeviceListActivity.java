@@ -69,17 +69,6 @@ public class DeviceListActivity extends Activity
         // Set result CANCELED in case the user backs out
         setResult(Activity.RESULT_CANCELED);
 
-        // Initialize the button to perform device discovery
-        Button scanButton = (Button) findViewById(R.id.button_scan);
-        scanButton.setOnClickListener(new OnClickListener()
-        {
-            public void onClick(View v)
-            {
-                doDiscovery();
-                v.setVisibility(View.GONE);
-            }
-        });
-
         // Initialize array adapters. One for already paired devices and
         // one for newly discovered devices
         mPairedDevicesArrayAdapter = new ArrayAdapter<>(this, R.layout.device_name);
@@ -107,6 +96,7 @@ public class DeviceListActivity extends Activity
         mBtAdapter = BluetoothAdapter.getDefaultAdapter();
 
         // Get a set of currently paired devices
+        /* no need for VNA
         Set<BluetoothDevice> pairedDevices = mBtAdapter.getBondedDevices();
 
         // If there are paired devices, add each one to the ArrayAdapter
@@ -122,7 +112,20 @@ public class DeviceListActivity extends Activity
         {
             String noDevices = getResources().getText(R.string.none_paired).toString();
             mPairedDevicesArrayAdapter.add(noDevices);
-        }
+        }*/
+
+        // Initialize the button to perform device discovery
+        Button scanButton = (Button) findViewById(R.id.button_scan);
+        /*scanButton.setOnClickListener(new OnClickListener()
+        {
+            public void onClick(View v)
+            {
+                doDiscovery();
+                v.setVisibility(View.GONE);
+            }
+        });// */
+        scanButton.setVisibility(View.GONE);
+        doDiscovery();
     }
 
     @Override
@@ -153,15 +156,10 @@ public class DeviceListActivity extends Activity
         setTitle(R.string.scanning);
 
         // Turn on sub-title for new devices
-        findViewById(R.id.title_new_devices).setVisibility(View.VISIBLE);
+        //findViewById(R.id.title_new_devices).setVisibility(View.VISIBLE);
 
-        // If we're already discovering, stop it
         if (mBtAdapter.isDiscovering())
-        {
             mBtAdapter.cancelDiscovery();
-        }
-
-        // Request discover from BluetoothAdapter
         mBtAdapter.startDiscovery();
     }
 
@@ -205,8 +203,8 @@ public class DeviceListActivity extends Activity
                 // Get the BluetoothDevice object from the Intent
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 // If it's already paired, skip it, because it's been listed already
-                if (device.getBondState() != BluetoothDevice.BOND_BONDED)
-                {
+                //no need for VNA if (device.getBondState() != BluetoothDevice.BOND_BONDED){
+                if (device.getName().contains("VNA")){
                     mNewDevicesArrayAdapter.add(device.getName() + "\n" + device.getAddress());
                 }
                 // When discovery is finished, change the Activity title

@@ -4,10 +4,10 @@
     <string name="title_section1">Monitor Data</string>
     <string name="action_connect">Connect</string>
 
-    <string name="scanning">scanning for devices…</string>
-    <string name="select_device">SELECT DEVICE TO CONNECT</string>
+    <string name="scanning">scanning for VNA…</string>
+    <string name="select_device">SELECT VNA TO CONNECT</string>
     <string name="none_paired">No devices have been paired</string>
-    <string name="none_found">No devices found</string>
+    <string name="none_found">No VNA found</string>
     <string name="title_paired_devices">Paired Devices</string>
     <string name="title_other_devices">Other Available Devices</string>
     <string name="button_scan">Scan for devices</string>

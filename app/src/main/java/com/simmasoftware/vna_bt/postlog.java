@@ -23,9 +23,10 @@ import java.util.Date;
 public class postlog {
     Context context;
     int counter=0;
-    String versionName= "unknown";
+    public String versionName= "unknown";
     public static String crashlogsfilename= Environment.getExternalStorageDirectory()+"/VNABT_crash_logs/";
     final SimpleDateFormat _sdfWatchUID = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+
 
     public postlog(Context context){
         this.context=context;

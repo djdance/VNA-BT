@@ -39,9 +39,11 @@ import android.widget.ToggleButton;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -58,7 +60,10 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_ACTION_REQUEST_ENABLE_AND_CONNECT = 2;
     private static final int REQUEST_ACTION_REQUEST_ENABLE=3;
     private static final int REQUEST_ACTION_REQUEST_ENABLE_AND_SCAN=4;
-    private static final UUID sppUUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"); //Write Characteristic: F8287520-BD28-11E4-B64D-0002A5D5C51B
+    private static UUID sppUUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+    /**
+     * If you are connecting to a Bluetooth serial board then try using the well-known SPP UUID 00001101-0000-1000-8000-00805F9B34FB. However if you are connecting to an Android peer then please generate your own unique UUID.
+     * */
     private static final byte RS232_FLAG = (byte) 0xC0;
     private static final byte RS232_ESCAPE = (byte) 0xDB;
     private static final byte RS232_ESCAPE_FLAG = (byte) 0xDC;
@@ -107,6 +112,7 @@ public class MainActivity extends AppCompatActivity {
         Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(Thread thread, Throwable throwable) {
+                //catch crash and log that
                 //Log.d(TAG, "exception: " + this.getClass().getName() + ", " + throwable.toString());
                 prefs_default.edit().putBoolean("crashed",true).apply();
                 final Writer result = new StringWriter();
@@ -149,14 +155,14 @@ public class MainActivity extends AppCompatActivity {
         mReception = (TextView) findViewById(R.id.EditTextReception);
         mReception.requestFocus();
         mReception.setMovementMethod(new ScrollingMovementMethod());
-        log("App started");
+        log("App started, ver."+(new postlog(this)).versionName);
         boolean restoredAfterCrash=prefs_default.getBoolean("crashed",false);
         if (restoredAfterCrash) {
             log("Restored after crash. Logs will be sent from "+postlog.crashlogsfilename);
             prefs_default.edit().putBoolean("crashed",false).apply();
         }
-        //if (!addressName.equals(""))
-        //    log("Last known device: "+addressName);
+        if (!addressName.equals(""))
+            log("Last known device: "+addressName+", "+address);
 
 
 
@@ -333,6 +339,7 @@ public class MainActivity extends AppCompatActivity {
         });
         initTextViews();//no need
 
+        //RUN ON START!
         if (!restoredAfterCrash) {
             //String ss = null; Log.d(TAG, ss.substring(5));//emulate crash
             checkAndEnableBT(((CheckBox) findViewById(R.id.startconnectCheckbox)).isChecked() ? REQUEST_ACTION_REQUEST_ENABLE_AND_CONNECT : REQUEST_ACTION_REQUEST_ENABLE);
@@ -350,6 +357,14 @@ public class MainActivity extends AppCompatActivity {
             }
         }).start();
     }
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (firstPing)
+            mHandler.sendMessageDelayed(Message.obtain(mHandler, 2, ""), 2000);
+        firstPing=false;
+    }
+
     boolean checkAndEnableBT(int REQUEST_ACTION){
         boolean enabled=bluetooth.isEnabled();
         if (!enabled) {
@@ -364,70 +379,17 @@ public class MainActivity extends AppCompatActivity {
         return enabled;
     }
     void autoConnect(){
-        log("Will auto connect on start...");
-        Thread connectThread = new Thread(new Runnable() {
+        log("Will auto connect on start with "+addressName);
+        (new Thread(new Runnable() {
             @Override
             public void run() {
                 connectDevice(address, 0);
             }
-        });
-        connectThread.start();
+        })).start();
     }
-    void log(String text){
-        log(0,text);
-    }
-    void log(boolean sent, String text){
-        log(sent?1:-1,text);
-    }
-    void log(final int sent, final String text){
-        runOnUiThread(new Runnable() {
-            public void run() {
-                String time111 = mSDF.format(new Date());
-                String ss=time111+" "+(sent!=0?(sent>0?"sent":"rcvd")+":":"")+" "+text;
-                mReception.append(ss+"\n");
-                if (mReception.length() > 2000)
-                    mReception.setText(mReception.getText().toString().substring(mReception.length() - 2000));
-                Log.d(TAG,ss);
-            }
-        });
-    }
-    void log(final boolean sent, final byte[] text, final int len){
-        runOnUiThread(new Runnable() {
-            public void run() {
-                String time111 = mSDF.format(new Date());
-                String ss=time111+" "+(sent?"sent":"rcvd")+": ";
-                for (int i = 0; i < len; i++) {
-                    String h=Integer.toHexString((int)(text[i] & 0xFF));
-                    if (h.length()==1)
-                        h="0"+h;
-                    ss = ss+h+" ";
-                }
-                //ss+=" = "+(new String(text));
-                mReception.append(ss+"\n");
-                if (mReception.length() > 2000)
-                    mReception.setText(mReception.getText().toString().substring(mReception.length() - 2000));
-                Log.d(TAG,ss);
-            }
-        });
-    }
-    void log(final boolean sent, final byte[] text){
-        log(sent,text,text.length);
-    }
-    @Override
-    protected void onPause() {
-        if (mHandler!=null) {
-            mHandler.removeMessages(1);
-            mHandler.removeMessages(2);
-        }
-        super.onPause();
-    }
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (firstPing)
-            mHandler.sendMessageDelayed(Message.obtain(mHandler, 2, ""), 2000);
-        firstPing=false;
-    }
+
+
+    //Dest repeater and ping repeater
     private Handler mHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
@@ -504,8 +466,6 @@ public class MainActivity extends AppCompatActivity {
                             mHandler.sendMessageDelayed(Message.obtain(mHandler, 2, ""), 1000 * delay);
                     }
                 }
-            } else if (msg.what>=3 && msg.what<=5){
-                connectDevice(address, msg.what-2);
             } else {
                 Log.d(TAG,"handle wrong msg "+msg.what);
             }
@@ -662,7 +622,7 @@ public class MainActivity extends AppCompatActivity {
             if (connect_button.getTitle().toString().compareToIgnoreCase("Connect") == 0) {
                 // do BT connect
                 connect_button.setTitle("Connecting...");
-                log("Connecting...");
+                log("Manual connecting started");
                 Intent serverIntent = new Intent(this, DeviceListActivity.class);
                 startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE_INSECURE);
             } else {
@@ -672,8 +632,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        switch (requestCode)
-        {
+        switch (requestCode) {
             case REQUEST_CONNECT_DEVICE_INSECURE:
                 // When DeviceListActivity returns with a bluetoothDevice to connect
                 if (resultCode == Activity.RESULT_OK) {
@@ -742,75 +701,116 @@ public class MainActivity extends AppCompatActivity {
     };
     private Thread readThread;
 
-    private BluetoothSocket connectDevice(final String address, int i) {
-        // Get the BluetoothDevice object
-
+    private void connectDevice(final String address, int i) {
         connected = false;
-        try{
-            BluetoothDevice bluetoothDevice = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(address);
-            bluetoothSocket = bluetoothDevice.createRfcommSocketToServiceRecord(sppUUID);
-            bluetoothSocket.connect();
+        log("Connecting to "+addressName);
+        BluetoothAdapter mBtAdapter = BluetoothAdapter.getDefaultAdapter();
 
-            this.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    Toast.makeText(getApplicationContext(), "Connected!", Toast.LENGTH_SHORT).show();
-                    log("Connected with "+addressName);
-                    if (connect_button != null) connect_button.setTitle("Disconnect");
-                    newData.put("Frames", "-");
-                    updateLabels();
-                }
-            });
-            connected = true;
-            //djd init_j1939();
-            if(readThread != null && readThread.isAlive()) {
-                readThread.interrupt();
-                while(readThread.isAlive()) Thread.yield();
-            } else {
-                readThread = new Thread(readRun);
-                readThread.setPriority(4);
-                readThread.start();
-            }
-            if (unsentDest>=0) {
-                this.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        log("Will retry unsent "+unsentDest+" in "+((EditText)findViewById(R.id.resentUnsentEditText)).getText().toString()+" sec");
-                    }
-                });
-                currDest=unsentDest;
-                unsentDest=-1;
-                int delay=500;
-                try {
-                    delay=Integer.parseInt(((EditText)findViewById(R.id.resentUnsentEditText)).getText().toString());
-                } catch (NumberFormatException e) {
-                    log("Wrong value for delay!");
-                }
-                mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), delay*1000);
-            }
 
-        } catch (Exception ioex){
-            log("BT error: "+ioex.toString().substring(20));
+        //discovering thread added 16012018
+        //if (!mBtAdapter.isDiscovering()) //will test it later
+        //    mBtAdapter.startDiscovery();
+        if (mBtAdapter.isDiscovering()) {
+            log("BT is discovering, wait...");
+            mBtAdapter.cancelDiscovery();
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+            }
+            connectDevice(address, 0);
         }
 
-        if (!connected){
+        BluetoothDevice bluetoothDevice = mBtAdapter.getRemoteDevice(address);
+        try {
+            /*debug* / sppUUID=bluetoothDevice.getUuids()[0].getUuid(); //if you don't know the UUID of the bluetooth device service, you can get it like this from android cache
+            /*debug* / Log.d(TAG,"debug sppUUID="+sppUUID);// */
+            bluetoothSocket = bluetoothDevice.createRfcommSocketToServiceRecord(sppUUID);
+        } catch (Exception ioex) {
+            bluetoothSocket=null;
+            log("BT socket error: "+(ioex!=null?ioex.toString().substring(20):""));
+            return;
+        }
+
+        try {
+            bluetoothSocket.connect();
+            connected = true;
+        } catch (Exception ioex) {
+            log("error: "+(ioex!=null?ioex.toString().substring(20):""));
+            if (ioex!=null && ioex.toString().contains(" timeout, read ret")){
+                //fallback added 16012018
+                //log("BT is busy, fallback...");
+                try {
+                    //mPort gets integer value "-1", and this value seems doesn't work for android >=4.2 , so you need to set it to "1"
+                    //Valid port channels are 1-30
+                    bluetoothSocket =(BluetoothSocket) bluetoothDevice.getClass().getMethod("createRfcommSocket", new Class[] {int.class}).invoke(bluetoothDevice,1);
+                    bluetoothSocket.connect();
+                    connected = true;
+                } catch (Exception ioex1) {
+                    log("fallback error: "+(ioex1!=null?ioex1.toString().substring(20):""));
+                }
+            }
+        }
+
+        if (!connected) {
+            bluetoothSocket=null;
             if(i<3){
-                log("will try one more time...("+i+")");
-                mHandler.sendMessageDelayed(Message.obtain(mHandler, 3+i, ""), 1000 );
+                log("failed. will try one more time...("+i+")");
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                }
+                connectDevice(address, i+1);
             } else {
                 this.runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
                         Toast.makeText(getApplicationContext(), "Bluetooth connection error", Toast.LENGTH_SHORT).show();
-                        log("Failed "+addressName+", is it active?");
+                        log("Failed with "+addressName+", is it active?");
                         if (connect_button != null) connect_button.setTitle("Connect");
                         disconnect();
                     }
                 });
             }
+            return;
         }
 
-        return (bluetoothSocket);
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(getApplicationContext(), "Connected!", Toast.LENGTH_SHORT).show();
+                log("Connected with "+addressName);
+                if (connect_button != null) connect_button.setTitle("Disconnect");
+                newData.put("Frames", "-");
+                updateLabels();
+            }
+        });
+
+        if (unsentDest>=0) { //moved upper readThread run. 16.01.2018
+            this.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    log("Will retry unsent "+unsentDest+" in "+((EditText)findViewById(R.id.resentUnsentEditText)).getText().toString()+" sec");
+                }
+            });
+            currDest=unsentDest;
+            unsentDest=-1;
+            int delay=500;
+            try {
+                delay=Integer.parseInt(((EditText)findViewById(R.id.resentUnsentEditText)).getText().toString());
+            } catch (NumberFormatException e) {
+                log("Wrong value for delay!");
+            }
+            mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), delay*1000);
+        }
+
+        if(readThread != null && readThread.isAlive()) {
+            readThread.interrupt();
+            while(readThread.isAlive()) Thread.yield();
+        } else {
+            readThread = new Thread(readRun);
+            readThread.setPriority(4);
+            readThread.start();
+        }
     }
 
 
@@ -821,18 +821,25 @@ public class MainActivity extends AppCompatActivity {
                 bluetoothSocket.close();
             } catch (IOException e) { }
         }
-        connectDevice(address, 1);
+        Thread connectThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                connectDevice(address, 1);
+            }
+        });
+        connectThread.start();
     }
 
     private void disconnect() {
         try {
+            mHandler.removeMessages(1);
+            mHandler.removeMessages(2);
             if(readThread != null) readThread.interrupt();
             if (bluetoothSocket != null)
             {
                 bluetoothSocket.close();
                 bluetoothSocket = null;
             }
-            mHandler.removeMessages(2);
         } catch (IOException e) {
             /* We don't really care about the reconnect exceptions */
             //Log.e(TAG, "In reconnect", e);
@@ -1026,7 +1033,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void sendCommand(TxStruct command) {
-        String prefix = "";
         log(true,command.getBuf(),Math.min(command.getLen(),20));
         if (bluetoothSocket != null) {
             try {
@@ -1052,6 +1058,57 @@ public class MainActivity extends AppCompatActivity {
             disconnect();
         }
     }
+
+
+    void log(String text){
+        log(0,text);
+    }
+    void log(boolean sent, String text){
+        log(sent?1:-1,text);
+    }
+    void log(final int sent, final String text){
+        runOnUiThread(new Runnable() {
+            public void run() {
+                String time111 = mSDF.format(new Date());
+                String ss=time111+" "+(sent!=0?(sent>0?"send":"rcvd")+":":"")+" "+text;
+                mReception.append(ss+"\n");
+                if (mReception.length() > 2000)
+                    mReception.setText(mReception.getText().toString().substring(mReception.length() - 2000));
+                Log.d(TAG,ss);
+            }
+        });
+    }
+    void log(final boolean sent, final byte[] text, final int len){
+        runOnUiThread(new Runnable() {
+            public void run() {
+                String time111 = mSDF.format(new Date());
+                String ss=time111+" "+(sent?"send":"rcvd")+": ";
+                for (int i = 0; i < len; i++) {
+                    String h=Integer.toHexString((int)(text[i] & 0xFF));
+                    if (h.length()==1)
+                        h="0"+h;
+                    ss = ss+h+" ";
+                }
+                //ss+=" = "+(new String(text));
+                mReception.append(ss+"\n");
+                if (mReception.length() > 2000)
+                    mReception.setText(mReception.getText().toString().substring(mReception.length() - 2000));
+                Log.d(TAG,ss);
+            }
+        });
+    }
+    void log(final boolean sent, final byte[] text){
+        log(sent,text,text.length);
+    }
+    @Override
+    protected void onPause() {
+        if (mHandler!=null) {
+            mHandler.removeMessages(1);
+            mHandler.removeMessages(2);
+        }
+        super.onPause();
+    }
+
 
 
     private int cksum(byte[] commandBytes)
