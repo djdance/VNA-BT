@@ -102,7 +102,9 @@ public class MainActivity extends AppCompatActivity {
     String address="", addressName="";
     SimpleDateFormat mSDF = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
     int counter_J1708_received=0, counter_J1708_sent=0;
-    boolean firstPing=true;
+    boolean firstPing=true,stopme=false;
+    int nextPort=0;
+    int repeatDestDelay=3;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -123,7 +125,7 @@ public class MainActivity extends AppCompatActivity {
                 Intent intent = new Intent(getApplicationContext(), checkService.class);
                 intent.putExtra("postlog", stacktrace);
                 startService(intent);
-                new Thread(new Runnable() {
+                /*new Thread(new Runnable() {
                     @Override
                     public void run() {
                         try {
@@ -135,8 +137,8 @@ public class MainActivity extends AppCompatActivity {
                         android.os.Process.killProcess(android.os.Process.myPid());
                     }
                 }).start();// */
-                //System.exit(0);
-                //android.os.Process.killProcess(android.os.Process.myPid());
+                System.exit(0);
+                android.os.Process.killProcess(android.os.Process.myPid());
             }
         });
         setContentView(R.layout.activity_main);
@@ -266,8 +268,18 @@ public class MainActivity extends AppCompatActivity {
         ((EditText) findViewById(R.id.repeatEditText)).setOnKeyListener(new View.OnKeyListener() {
             @Override
             public boolean onKey(View v, int keyCode, KeyEvent event) {
+                setRepeatDestDelay();
                 prefs_default.edit().putString("repeatEditText",((EditText) findViewById(R.id.repeatEditText)).getText().toString()).commit();
                 return false;
+            }
+        });
+        setRepeatDestDelay();
+
+        ((CheckBox) findViewById(R.id.automuteCheckbox)).setChecked(prefs_default.getBoolean("automuteCheckbox",true));
+        ((CheckBox) findViewById(R.id.automuteCheckbox)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                prefs_default.edit().putBoolean("automuteCheckbox",isChecked).commit();
             }
         });
 
@@ -278,6 +290,7 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(getApplicationContext(),"No internet", Toast.LENGTH_LONG).show();
                     return;
                 }
+                log(((TextView) findViewById(R.id.lostCounter)).getText().toString());
                 (new postlog(MainActivity.this)).post(mReception.getText().toString(),true);
                 mReception.setText("log sent\n");
             }
@@ -339,6 +352,13 @@ public class MainActivity extends AppCompatActivity {
         });
         initTextViews();//no need
 
+        ((Button) findViewById(R.id.buttonTest)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                //debug test
+            }
+        });
+
         //RUN ON START!
         if (!restoredAfterCrash) {
             //String ss = null; Log.d(TAG, ss.substring(5));//emulate crash
@@ -357,14 +377,43 @@ public class MainActivity extends AppCompatActivity {
             }
         }).start();
     }
+    void setRepeatDestDelay(){
+        repeatDestDelay = 0;
+        try {
+            repeatDestDelay = Integer.parseInt(((EditText) findViewById(R.id.repeatEditText)).getText().toString());
+        } catch (Exception e) {
+        }
+        if (repeatDestDelay <= 0)
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    ((CheckBox) findViewById(R.id.repeatCheckbox)).setChecked(false);
+                }
+            });
+    }
     @Override
     protected void onResume() {
         super.onResume();
-        if (firstPing)
+        stopme=false;
+        if (firstPing) {
             mHandler.sendMessageDelayed(Message.obtain(mHandler, 2, ""), 2000);
-        firstPing=false;
+            firstPing = false;
+        }else if (repeatDestDelay>0 && currDest!=-1) {
+            log("Resumed to repeat Dest "+currDest);
+            mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), 1000);
+        }
     }
-
+    @Override
+    protected void onPause() {
+        log("Pause");
+        stopme=true;
+        disconnect();
+        super.onPause();
+    }
+    @Override
+    protected void onDestroy() {
+        log("Destroy");
+        super.onDestroy();
+    }
     boolean checkAndEnableBT(int REQUEST_ACTION){
         boolean enabled=bluetooth.isEnabled();
         if (!enabled) {
@@ -396,7 +445,7 @@ public class MainActivity extends AppCompatActivity {
             if (msg.what == 1) {
                 //send to Dest and repeat if need
                 mHandler.removeMessages(2);
-                if (((CheckBox)findViewById(R.id.resendUnsent)).isChecked())
+                if (currDest!=-1 && ((CheckBox)findViewById(R.id.resendUnsent)).isChecked())
                     unsentDest=currDest;
                 if (connected) {
                     sendbuttonWorkDest(currDest);
@@ -405,21 +454,8 @@ public class MainActivity extends AppCompatActivity {
                             sendbuttonWorkDest(currDest);
                         }
                     });*/
-                    if (((CheckBox) findViewById(R.id.repeatCheckbox)).isChecked()) {
-                        int delay = 0;
-                        try {
-                            delay = Integer.parseInt(((EditText) findViewById(R.id.repeatEditText)).getText().toString());
-                        } catch (Exception e) {
-                        }
-                        if (delay <= 0)
-                            runOnUiThread(new Runnable() {
-                                public void run() {
-                                    ((CheckBox) findViewById(R.id.repeatCheckbox)).setChecked(false);
-                                }
-                            });
-                        else
-                            mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), 1000 * delay);
-                    }
+                    if (repeatDestDelay>0)
+                        mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), 1000 * repeatDestDelay);
                 } else {
                     log("Not connected yet");
                     if (((CheckBox) findViewById(R.id.startconnectCheckbox)).isChecked()){
@@ -476,6 +512,9 @@ public class MainActivity extends AppCompatActivity {
         if (currDest+increment>=0)
             currDest+=increment;
         ((TextView) findViewById(R.id.curDestTV)).setText(""+currDest);
+        if (currDest!=-1)
+            unsentDest=currDest;
+        checkAndEnableBT(REQUEST_ACTION_REQUEST_ENABLE);
         mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), 50);
     }
     void sendbuttonWorkDest(int dest){
@@ -510,7 +549,7 @@ public class MainActivity extends AppCompatActivity {
 
         message[0] = 0;
         message[1] = 12;//length with checksum
-        message[2] = (byte) TX_J1708; //VNA_MSG_TX_J1587
+        message[2] = (byte) TX_J1708; //VNA_MSG_TX_J1587  //0x08
 
         message[13] = (byte) cksum(message);
 
@@ -703,7 +742,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void connectDevice(final String address, int i) {
         connected = false;
-        log("Connecting to "+addressName);
+        log("Connecting to "+addressName+"...");
         BluetoothAdapter mBtAdapter = BluetoothAdapter.getDefaultAdapter();
 
 
@@ -742,30 +781,34 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     //mPort gets integer value "-1", and this value seems doesn't work for android >=4.2 , so you need to set it to "1"
                     //Valid port channels are 1-30
-                    bluetoothSocket =(BluetoothSocket) bluetoothDevice.getClass().getMethod("createRfcommSocket", new Class[] {int.class}).invoke(bluetoothDevice,1);
+                    nextPort=(nextPort+1)%30;
+                    bluetoothSocket =(BluetoothSocket) bluetoothDevice.getClass().getMethod("createRfcommSocket", new Class[] {int.class}).invoke(bluetoothDevice,nextPort);
                     bluetoothSocket.connect();
                     connected = true;
                 } catch (Exception ioex1) {
-                    log("fallback error: "+(ioex1!=null?ioex1.toString().substring(20):""));
+                    log("fallback error["+nextPort+"]: "+(ioex1!=null?ioex1.toString().substring(20):""));
                 }
             }
         }
 
         if (!connected) {
             bluetoothSocket=null;
-            if(i<3){
-                log("failed. will try one more time...("+i+")");
+            if(i<5){
+                log("failed. will try again... "+(5-i));
                 try {
-                    Thread.sleep(1000);
+                    Thread.sleep(200);
                 } catch (InterruptedException e) {
                 }
-                connectDevice(address, i+1);
+                if (!stopme)
+                    connectDevice(address, i+1);
+                else
+                    return;
             } else {
+                log("Failed with "+addressName+", is it active?");
                 this.runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
                         Toast.makeText(getApplicationContext(), "Bluetooth connection error", Toast.LENGTH_SHORT).show();
-                        log("Failed with "+addressName+", is it active?");
                         if (connect_button != null) connect_button.setTitle("Connect");
                         disconnect();
                     }
@@ -773,6 +816,7 @@ public class MainActivity extends AppCompatActivity {
             }
             return;
         }
+        init_j1939();
 
         this.runOnUiThread(new Runnable() {
             @Override
@@ -815,12 +859,8 @@ public class MainActivity extends AppCompatActivity {
 
 
     private void reconnect() {
+        disconnect();
         log("Bluetooth reconnection...");
-        if(bluetoothSocket != null) {
-            try {
-                bluetoothSocket.close();
-            } catch (IOException e) { }
-        }
         Thread connectThread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -832,11 +872,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void disconnect() {
         try {
-            mHandler.removeMessages(1);
-            mHandler.removeMessages(2);
+            if (mHandler!=null) {
+                mHandler.removeMessages(1);
+                mHandler.removeMessages(2);
+            }
             if(readThread != null) readThread.interrupt();
-            if (bluetoothSocket != null)
-            {
+            if (bluetoothSocket != null){
                 bluetoothSocket.close();
                 bluetoothSocket = null;
             }
@@ -847,7 +888,12 @@ public class MainActivity extends AppCompatActivity {
         if (connected)
             log("Disconnected");
         connected = false;
-        if(connect_button != null) connect_button.setTitle("Connect");
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if(connect_button != null) connect_button.setTitle("Connect");
+            }
+        });
     }
 
     private void receiveDataFromBT(BluetoothSocket socket) {
@@ -889,7 +935,7 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 } catch (InterruptedException e) {
                     inputStream.close();
-                    Log.e(TAG,"Interrupted read",e);
+                    log(true,"Interrupted read "+e);
                     return;
                 }
             }
@@ -928,6 +974,7 @@ public class MainActivity extends AppCompatActivity {
                         } else {
                             isInvalid = true;
                             // Invalid byte after escape, must abort
+                            log(false,"stuffed invalid");
                             return;
                         }
                     }
@@ -950,18 +997,19 @@ public class MainActivity extends AppCompatActivity {
                             m_count--; //Ignore the checksum at the end of the message
                             processPacket(m_buffer);
                         } else {
-                            log("Received data is invalid");
+                            log(false,"cksum invalid");
                         }
                 }
             }
         } catch (Exception e) {
-            System.out.println(e.getStackTrace()[0]);
+            log(false," "+e);
         }
     }
 
     private void processPacket(byte[] packet) {
         int msgID = packet[2];
-        if (msgID == ACK) {
+        log(true,"processing packed with ID "+msgID);
+        if (msgID == ACK) {//0x00
             int id=packet[3];
             if (id==TX_J1708){
                 counter_J1708_received++;
@@ -972,7 +1020,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                 });
             }
-        } else if (msgID == RX_J1939) {
+        } else if (msgID == RX_J1939) {//0x06
             final Integer pgn = ((packet[4] & 0xFF) << 16) | ((packet[5] & 0xFF) << 8) | (packet[6] & 0xFF);
             Double d;
             Integer i;
@@ -998,8 +1046,18 @@ public class MainActivity extends AppCompatActivity {
                     newData.put("Oil Pressure", out); /* SPN 100 */
                     break;
             }
-        } else if(msgID == STATS) {
-            byte a = packet[11];
+        } else if(msgID == STATS) { //0x10
+            if (prefs_default.getBoolean("automuteCheckbox",true)) {
+                log(true,"Stats data detected, will mute it...");
+                toggleWork(0, false);
+                this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        ((ToggleButton) findViewById(R.id.button_sendExample)).setChecked(false);
+                    }
+                });
+            }
+            /*byte a = packet[11];
             byte b = packet[12];
             byte c = packet[13];
             byte d = packet[14];
@@ -1010,7 +1068,7 @@ public class MainActivity extends AppCompatActivity {
                 public void run() {
                     updateLabels();
                 }
-            });
+            });*/
         }
     }
 
@@ -1034,28 +1092,28 @@ public class MainActivity extends AppCompatActivity {
 
     private void sendCommand(TxStruct command) {
         log(true,command.getBuf(),Math.min(command.getLen(),20));
+        boolean ok=false;
         if (bluetoothSocket != null) {
             try {
                 bluetoothSocket.getOutputStream().write(command.getBuf(),0,command.getLen());
                 unsentDest=-1;
+                ok=true;
             }catch (IOException e){
                 log("error! BT output socket closed");
-                if (((CheckBox) findViewById(R.id.reconnectCheckbox)).isChecked()) {
-                    log("Will try to auto reconnect...");
-                    //reconnect();//crash
-                    Thread connectThread = new Thread(new Runnable() {
-                        @Override
-                        public void run() {
-                            connectDevice(address, 0);
-                        }
-                    });
-                    connectThread.start();
-                }
             }
         } else {
             log("error! No BT connected");
-            log("PLEASE REPORT IN THIS CASE! Will add BT reconnecting and here!");
-            disconnect();
+        }
+        if (!ok && ((CheckBox) findViewById(R.id.reconnectCheckbox)).isChecked()) {
+            log("Will try to auto reconnect...");
+            Thread connectThread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    //connectDevice(address, 0);
+                    reconnect();
+                }
+            });
+            connectThread.start();
         }
     }
 
@@ -1072,8 +1130,8 @@ public class MainActivity extends AppCompatActivity {
                 String time111 = mSDF.format(new Date());
                 String ss=time111+" "+(sent!=0?(sent>0?"send":"rcvd")+":":"")+" "+text;
                 mReception.append(ss+"\n");
-                if (mReception.length() > 2000)
-                    mReception.setText(mReception.getText().toString().substring(mReception.length() - 2000));
+                if (mReception.length() > 15000)
+                    mReception.setText(mReception.getText().toString().substring(mReception.length() - 15000));
                 Log.d(TAG,ss);
             }
         });
@@ -1091,22 +1149,14 @@ public class MainActivity extends AppCompatActivity {
                 }
                 //ss+=" = "+(new String(text));
                 mReception.append(ss+"\n");
-                if (mReception.length() > 2000)
-                    mReception.setText(mReception.getText().toString().substring(mReception.length() - 2000));
+                if (mReception.length() > 15000)
+                    mReception.setText(mReception.getText().toString().substring(mReception.length() - 15000));
                 Log.d(TAG,ss);
             }
         });
     }
     void log(final boolean sent, final byte[] text){
         log(sent,text,text.length);
-    }
-    @Override
-    protected void onPause() {
-        if (mHandler!=null) {
-            mHandler.removeMessages(1);
-            mHandler.removeMessages(2);
-        }
-        super.onPause();
     }
 
 
@@ -1142,17 +1192,19 @@ public class MainActivity extends AppCompatActivity {
         m_buffer = new byte[4096];
         m_count = 0;
         // trimUntil = 0;
-        long[] initPGN_AddFilter = {61444, 65262, 65263};
+
+
         /*
 PGN (Parameter Group Number) — номер группы параметров, определяющий содер-
 жимое соответствующего сообщения шины CAN согласно SAE J1939. Термин PGN ис-
 пользуется для обозначения сообщений шины CAN.
-         */
+         * /
+        long[] initPGN_AddFilter = {61444, 65262, 65263};
 
         for(long pgn:initPGN_AddFilter)
         {
             sendCommand(filterAddDelJ1939((byte) 0, pgn, true));
-        }
+        }// */
     }
 
     public TxStruct filterAddDelJ1939(byte port, long pgnLong, boolean add)

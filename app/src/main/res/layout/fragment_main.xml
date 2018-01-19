@@ -193,25 +193,33 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
+            <CheckBox
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Automute ODB report"
+                android:checked="true"
+                android:id="@+id/automuteCheckbox"/>
             <ToggleButton
                 android:id="@+id/button_sendExample"
                 android:layout_width="wrap_content"
                 android:layout_height="35dp"
-                android:text=" Mute autoreports "
-                android:textOn=" Mute autoreports "
-                android:textOff=" Mute autoreports "
+                android:text="Mute"
+                android:textOn="Mute"
+                android:textOff="Mute"
+                android:visibility="gone"
                 />
             <Button
                 android:id="@+id/button_sendrs232"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text=" Enable RS232 D9"
-                android:visibility="gone"/>
+                android:visibility="visible"/>
             <Button
-                android:id="@+id/button_sendLogs"
+                android:id="@+id/buttonTest"
                 android:layout_width="wrap_content"
-                android:layout_height="35dp"
-                android:text="send log to server"/>
+                android:layout_height="wrap_content"
+                android:text="test"
+                android:visibility="gone"/>
         </LinearLayout>
 
 
@@ -310,7 +318,6 @@
         android:hint="Logs and reports"
         android:scrollbars="vertical"
         android:textSize="10sp"></TextView>
-
     <LinearLayout
         android:orientation="vertical"
         android:layout_width="fill_parent"
@@ -385,5 +392,13 @@
             android:gravity="end" />
 
     </LinearLayout>
+
+    <Button
+        android:id="@+id/button_sendLogs"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="send log"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentBottom="true"/>
 
 </RelativeLayout>

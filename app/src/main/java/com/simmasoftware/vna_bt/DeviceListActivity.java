@@ -173,17 +173,19 @@ public class DeviceListActivity extends Activity
 
             // Get the device MAC address, which is the last 17 chars in the View
             String info = ((TextView) v).getText().toString();
-            Log.d(TAG,"DeviceListActivity: "+info);
-            String address = info.substring(info.length() - 17);
-            info=info.substring(0,info.length()-18);
+            if (info.length()>20) {
+                Log.d(TAG, "DeviceListActivity: " + info);
+                String address = info.substring(info.length() - 17);
+                info = info.substring(0, info.length() - 18);
 
-            // Create the result Intent and include the MAC address
-            Intent intent = new Intent();
-            intent.putExtra(EXTRA_DEVICE_ADDRESS, address);
-            intent.putExtra("addressName", info);
+                // Create the result Intent and include the MAC address
+                Intent intent = new Intent();
+                intent.putExtra(EXTRA_DEVICE_ADDRESS, address);
+                intent.putExtra("addressName", info);
 
-            // Set result and finish this Activity
-            setResult(Activity.RESULT_OK, intent);
+                // Set result and finish this Activity
+                setResult(Activity.RESULT_OK, intent);
+            }
             finish();
         }
     };
@@ -204,7 +206,7 @@ public class DeviceListActivity extends Activity
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 // If it's already paired, skip it, because it's been listed already
                 //no need for VNA if (device.getBondState() != BluetoothDevice.BOND_BONDED){
-                if (device.getName().contains("VNA")){
+                if (device!=null && device.getName()!=null && device.getName().contains("VNA")){
                     mNewDevicesArrayAdapter.add(device.getName() + "\n" + device.getAddress());
                 }
                 // When discovery is finished, change the Activity title
