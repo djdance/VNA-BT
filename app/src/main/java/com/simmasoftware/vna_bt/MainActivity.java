@@ -14,13 +14,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Message;
 import android.preference.PreferenceManager;
-import android.support.v4.app.Fragment;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.text.method.ScrollingMovementMethod;
@@ -39,16 +39,13 @@ import android.widget.ToggleButton;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
-import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 
 
@@ -79,6 +76,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int TX_J1708 = 8;
     private static final int RX_J1708 = 9;
     private static final int STATS = 23;
+    private static final int ODO = 46;//0x2e
+    private static final int RS232 = 35;//0x23
     private static final double KM_TO_MI = 0.621371;
     private static final double L_TO_GAL = 0.264172;
     private static final double KPA_TO_PSI = 0.145037738;
@@ -105,6 +104,7 @@ public class MainActivity extends AppCompatActivity {
     boolean firstPing=true,stopme=false;
     int nextPort=0;
     int repeatDestDelay=3;
+    boolean toggledRS232 =false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -262,14 +262,15 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 prefs_default.edit().putBoolean("repeatCheckbox",isChecked).commit();
+                setRepeatDestDelay();
             }
         });
         ((EditText) findViewById(R.id.repeatEditText)).setText(prefs_default.getString("repeatEditText","3"));
         ((EditText) findViewById(R.id.repeatEditText)).setOnKeyListener(new View.OnKeyListener() {
             @Override
             public boolean onKey(View v, int keyCode, KeyEvent event) {
-                setRepeatDestDelay();
                 prefs_default.edit().putString("repeatEditText",((EditText) findViewById(R.id.repeatEditText)).getText().toString()).commit();
+                setRepeatDestDelay();
                 return false;
             }
         });
@@ -291,21 +292,39 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
                 log(((TextView) findViewById(R.id.lostCounter)).getText().toString());
+                log("repeatCheckbox="+prefs_default.getBoolean("repeatCheckbox",false)+", repeatDestDelay="+repeatDestDelay
+                        +", currDest="+currDest+", unsentDest="+unsentDest
+                        +", reconnectCheckbox "+((CheckBox) findViewById(R.id.reconnectCheckbox)).isChecked()
+                        +", pingCheckbox "+((CheckBox) findViewById(R.id.pingCheckbox)).isChecked()+" by "+((EditText) findViewById(R.id.pingEditText)).getText()+" sec "
+                        +", repeatCheckbox "+((CheckBox) findViewById(R.id.repeatCheckbox)).isChecked()+" by "+((EditText) findViewById(R.id.repeatEditText)).getText()+" sec "
+                        +", autoEnableRS232Checkbox "+((CheckBox) findViewById(R.id.autoEnableRS232Checkbox)).isChecked()
+                );
                 (new postlog(MainActivity.this)).post(mReception.getText().toString(),true);
-                mReception.setText("log sent\n");
+                mReception.setText("log saved and will be sent\n");
             }
         });
 
-        ((ToggleButton) findViewById(R.id.button_sendExample)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+        ((CheckBox) findViewById(R.id.autoEnableRS232Checkbox)).setChecked(prefs_default.getBoolean("autoEnableRS232Checkbox",false));
+        ((CheckBox) findViewById(R.id.autoEnableRS232Checkbox)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                toggleWork(0,isChecked);
+                prefs_default.edit().putBoolean("autoEnableRS232Checkbox",isChecked).commit();
+                log("Will turn RS232 "+(isChecked?"on":"off"));
+                toggleRS232(isChecked);
             }
         });
         ((Button) findViewById(R.id.button_sendrs232)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                toggleWork(1,true);
+                toggleRS232(true);
+            }
+        });
+        toggleRS232(null);
+
+        ((ToggleButton) findViewById(R.id.button_sendExample)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                toggleWork(0,isChecked);
             }
         });
         ((Button) findViewById(R.id.button_sendDest1)).setOnClickListener(new View.OnClickListener() {
@@ -377,8 +396,32 @@ public class MainActivity extends AppCompatActivity {
             }
         }).start();
     }
+    void toggleRS232(Boolean isChecked){//null just for displaying, value for toggling
+        boolean che=prefs_default.getBoolean("autoEnableRS232Checkbox",false);
+        findViewById(R.id.resendLL).setBackgroundColor(che? Color.LTGRAY:Color.TRANSPARENT);
+        findViewById(R.id.repeatLL).setBackgroundColor(che? Color.LTGRAY:Color.TRANSPARENT);
+        findViewById(R.id.sendLL).setBackgroundColor(che? Color.LTGRAY:Color.TRANSPARENT);
+
+        /*findViewById(R.id.resendLL).setVisibility(che?View.GONE:View.VISIBLE);
+        findViewById(R.id.repeatLL).setVisibility(che?View.GONE:View.VISIBLE);
+        findViewById(R.id.sendLL).setVisibility(che?View.GONE:View.VISIBLE);
+        if (connect_button!=null)
+            connect_button.setEnabled(!che);*/
+        if (isChecked==null)
+            return;
+        toggledRS232=isChecked;
+        toggleWork(1,isChecked);
+        if (isChecked && ((CheckBox) findViewById(R.id.pingCheckbox)).isChecked()) {
+            log("And start to ping with ACK");
+            mHandler.sendMessageDelayed(Message.obtain(mHandler, 2, ""), 2000);
+        }
+    }
     void setRepeatDestDelay(){
         repeatDestDelay = 0;
+        if (!prefs_default.getBoolean("repeatCheckbox",false)) {
+            mHandler.removeMessages(1);
+            return;
+        }
         try {
             repeatDestDelay = Integer.parseInt(((EditText) findViewById(R.id.repeatEditText)).getText().toString());
         } catch (Exception e) {
@@ -387,6 +430,7 @@ public class MainActivity extends AppCompatActivity {
             runOnUiThread(new Runnable() {
                 public void run() {
                     ((CheckBox) findViewById(R.id.repeatCheckbox)).setChecked(false);
+                    //Toast.makeText(getApplicationContext(),"Wrong zero interval", Toast.LENGTH_SHORT);
                 }
             });
     }
@@ -394,7 +438,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         stopme=false;
-        if (firstPing) {
+        if (firstPing || toggledRS232) {
+            log("Start to ping on app resume");
             mHandler.sendMessageDelayed(Message.obtain(mHandler, 2, ""), 2000);
             firstPing = false;
         }else if (repeatDestDelay>0 && currDest!=-1) {
@@ -444,8 +489,9 @@ public class MainActivity extends AppCompatActivity {
         public void handleMessage(Message msg) {
             if (msg.what == 1) {
                 //send to Dest and repeat if need
+                mHandler.removeMessages(1);
                 mHandler.removeMessages(2);
-                if (currDest!=-1 && ((CheckBox)findViewById(R.id.resendUnsent)).isChecked())
+                if (currDest!=-1 && ((CheckBox)findViewById(R.id.resendUnsent)).isChecked() && !toggledRS232)
                     unsentDest=currDest;
                 if (connected) {
                     sendbuttonWorkDest(currDest);
@@ -454,11 +500,13 @@ public class MainActivity extends AppCompatActivity {
                             sendbuttonWorkDest(currDest);
                         }
                     });*/
-                    if (repeatDestDelay>0)
+                    if (repeatDestDelay>0 && !toggledRS232) {
+                        log("will repeat Dest in "+repeatDestDelay+" sec");
                         mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), 1000 * repeatDestDelay);
+                    }
                 } else {
                     log("Not connected yet");
-                    if (((CheckBox) findViewById(R.id.startconnectCheckbox)).isChecked()){
+                    if (((CheckBox) findViewById(R.id.startconnectCheckbox)).isChecked() && !toggledRS232){
                         Thread reconnectThread = new Thread(new Runnable() {
                             @Override
                             public void run() {
@@ -470,22 +518,23 @@ public class MainActivity extends AppCompatActivity {
                 }
             } else if (msg.what==2) {
                 //send ping
-                if (connected) {
+                if (true /*debug*/ || connected) {
                     log(true,"Start ping");
-                    int desst=0;
-                    try {
-                        desst = Integer.parseInt(((EditText) findViewById(R.id.pingByDestEditText)).getText().toString());
-                    } catch (Exception e) {
-                        desst=-1;
-                        log("No Dest, will ping by ACK");
-                    }
+                    int desst=-1;
+                    if (!toggledRS232)
+                        try {
+                            desst = Integer.parseInt(((EditText) findViewById(R.id.pingByDestEditText)).getText().toString());
+                        } catch (Exception e) {
+                            desst=-1;
+                            log("No Dest, will ping by ACK");
+                        }
                     if (desst<0)
                         toggleWork(2, false);
                     else
                         sendbuttonWorkDest(desst);
 
                     //and repeat
-                    if (((CheckBox) findViewById(R.id.pingCheckbox)).isChecked()) {
+                    if (((CheckBox) findViewById(R.id.pingCheckbox)).isChecked()/* && !toggledRS232*/) {
                         int delay = 7;
                         try {
                             delay = Integer.parseInt(((EditText) findViewById(R.id.pingEditText)).getText().toString());
@@ -584,10 +633,14 @@ public class MainActivity extends AppCompatActivity {
         byte[] message=new byte[0];
         if (casse==1) {
             //toggle rs232
+            if (!isChecked){
+                log("Impossible to turn off RS232. Try to reset VNA");
+                return;
+            }
             message = new byte[4];
             message[0] = 0;
             message[1] = 2;//length
-            message[2] = 35;
+            message[2] = RS232;//35 - 0x23
             message[3] = (byte) cksum(message);
         }else if (casse==0) {
             //toggle VNA BT reporrt
@@ -796,7 +849,7 @@ public class MainActivity extends AppCompatActivity {
             if(i<5){
                 log("failed. will try again... "+(5-i));
                 try {
-                    Thread.sleep(200);
+                    Thread.sleep(500);
                 } catch (InterruptedException e) {
                 }
                 if (!stopme)
@@ -845,6 +898,11 @@ public class MainActivity extends AppCompatActivity {
                 log("Wrong value for delay!");
             }
             mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), delay*1000);
+        }
+
+        if(!toggledRS232 && prefs_default.getBoolean("autoEnableRS232Checkbox",false)){
+            log("Will auto turn on RS232");
+            toggleRS232(true);
         }
 
         if(readThread != null && readThread.isAlive()) {
@@ -1008,19 +1066,29 @@ public class MainActivity extends AppCompatActivity {
 
     private void processPacket(byte[] packet) {
         int msgID = packet[2];
-        log(true,"processing packed with ID "+msgID);
+        String s="processing packed with ID "+msgID+" ";
         if (msgID == ACK) {//0x00
+            s+="- ACK: ";
             int id=packet[3];
             if (id==TX_J1708){
+                s+="J1708";
                 counter_J1708_received++;
                 this.runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
                         updateLabels();
+                        Toast.makeText(getApplicationContext(),"Dest successfully passed!", Toast.LENGTH_SHORT).show();
                     }
                 });
+            } else if (id==0x40){
+                s+="STATS toggled";
+            } else if (id==RS232){ //35;//0x23
+                s+="RS232 is on";
             }
+        } else if (msgID == ODO) {//46 = 0x2e
+            s+="- ODO";
         } else if (msgID == RX_J1939) {//0x06
+            s+="- RX_J1939";
             final Integer pgn = ((packet[4] & 0xFF) << 16) | ((packet[5] & 0xFF) << 8) | (packet[6] & 0xFF);
             Double d;
             Integer i;
@@ -1046,10 +1114,13 @@ public class MainActivity extends AppCompatActivity {
                     newData.put("Oil Pressure", out); /* SPN 100 */
                     break;
             }
-        } else if(msgID == STATS) { //0x10
-            if (prefs_default.getBoolean("automuteCheckbox",true)) {
+        } else if(msgID == STATS) { //0x17 = 23
+            s+="- STATS";
+            log(false,s);
+            s="";
+            if (true || prefs_default.getBoolean("automuteCheckbox",true)) {
                 log(true,"Stats data detected, will mute it...");
-                toggleWork(0, false);
+                toggleWork(0, true);
                 this.runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
@@ -1069,7 +1140,11 @@ public class MainActivity extends AppCompatActivity {
                     updateLabels();
                 }
             });*/
+        } else {
+            s += "(unknown)";
         }
+        if (!s.equals(""))
+            log(false,s);
     }
 
     private void updateLabels() {
@@ -1093,6 +1168,7 @@ public class MainActivity extends AppCompatActivity {
     private void sendCommand(TxStruct command) {
         log(true,command.getBuf(),Math.min(command.getLen(),20));
         boolean ok=false;
+        ///*debug*/unsentDest=-1; ok=true;
         if (bluetoothSocket != null) {
             try {
                 bluetoothSocket.getOutputStream().write(command.getBuf(),0,command.getLen());

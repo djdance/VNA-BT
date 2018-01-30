@@ -49,7 +49,7 @@
             <CheckBox
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Start ping every "
+                android:text="Ping every "
                 android:checked="true"
                 android:id="@+id/pingCheckbox"/>
             <EditText
@@ -72,13 +72,54 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="or ACK if empty"
+                android:text="or ACK if empty or RS232"
                 android:lines="1"
                 />
         </LinearLayout>
         <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <CheckBox
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Automute ODB report"
+                android:checked="true"
+                android:visibility="gone"
+                android:id="@+id/automuteCheckbox"/>
+            <ToggleButton
+                android:id="@+id/button_sendExample"
+                android:layout_width="wrap_content"
+                android:layout_height="35dp"
+                android:text="Mute"
+                android:textOn="Mute"
+                android:textOff="Mute"
+                android:visibility="gone"
+                />
+            <Button
+                android:id="@+id/button_sendrs232"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" Enable RS232 D9"
+                android:visibility="gone"/>
+            <CheckBox
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Auto enable RS232 after connect"
+                android:checked="false"
+                android:id="@+id/autoEnableRS232Checkbox"/>
+            <Button
+                android:id="@+id/buttonTest"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="test"
+                android:visibility="gone"/>
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:id="@+id/resendLL"
             android:orientation="horizontal">
             <CheckBox
                 android:layout_width="wrap_content"
@@ -127,6 +168,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:id="@+id/repeatLL"
             android:orientation="horizontal">
             <CheckBox
                 android:layout_width="wrap_content"
@@ -148,6 +190,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:id="@+id/sendLL"
             android:orientation="horizontal">
             <TextView
                 android:layout_width="wrap_content"
@@ -189,39 +232,6 @@
                 android:text=""
                 />
         </LinearLayout>
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <CheckBox
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Automute ODB report"
-                android:checked="true"
-                android:id="@+id/automuteCheckbox"/>
-            <ToggleButton
-                android:id="@+id/button_sendExample"
-                android:layout_width="wrap_content"
-                android:layout_height="35dp"
-                android:text="Mute"
-                android:textOn="Mute"
-                android:textOff="Mute"
-                android:visibility="gone"
-                />
-            <Button
-                android:id="@+id/button_sendrs232"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text=" Enable RS232 D9"
-                android:visibility="visible"/>
-            <Button
-                android:id="@+id/buttonTest"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="test"
-                android:visibility="gone"/>
-        </LinearLayout>
-
 
         <TextView
             android:layout_width="wrap_content"
