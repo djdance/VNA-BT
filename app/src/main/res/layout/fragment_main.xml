@@ -224,7 +224,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textStyle="bold"
-                android:text="Send" />
+                android:text="Send BT" />
+            <Button
+                android:id="@+id/button_sendDestLastRs232"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Send RS232" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

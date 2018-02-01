@@ -37,16 +37,22 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.security.InvalidParameterException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
+import android_serialport_api.SerialPort;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -105,6 +111,11 @@ public class MainActivity extends AppCompatActivity {
     int nextPort=0;
     int repeatDestDelay=3;
     boolean toggledRS232 =false;
+
+    protected SerialPort mSerialPort;
+    protected OutputStream mOutputStream;
+    private InputStream mInputStream;
+    private ReadThread mReadThread;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -369,6 +380,12 @@ public class MainActivity extends AppCompatActivity {
                 sendbuttonWork(0);
             }
         });
+        ((Button) findViewById(R.id.button_sendDestLastRs232)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                sendbuttonWork(0,true);
+            }
+        });
         initTextViews();//no need
 
         ((Button) findViewById(R.id.buttonTest)).setOnClickListener(new View.OnClickListener() {
@@ -457,6 +474,13 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         log("Destroy");
+        if (mReadThread != null)
+            mReadThread.interrupt();
+        if (mSerialPort != null) {
+            mSerialPort.close();
+            mSerialPort = null;
+        }
+
         super.onDestroy();
     }
     boolean checkAndEnableBT(int REQUEST_ACTION){
@@ -558,18 +582,28 @@ public class MainActivity extends AppCompatActivity {
     };
 
     void sendbuttonWork(int increment){
+     sendbuttonWork(increment,false);
+    }
+    void sendbuttonWork(int increment, boolean isRs232){
         if (currDest+increment>=0)
             currDest+=increment;
         ((TextView) findViewById(R.id.curDestTV)).setText(""+currDest);
+        if (isRs232) {
+            sendbuttonWorkDest(currDest, true);
+            return;
+        }
         if (currDest!=-1)
             unsentDest=currDest;
         checkAndEnableBT(REQUEST_ACTION_REQUEST_ENABLE);
         mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), 50);
     }
     void sendbuttonWorkDest(int dest){
+        sendbuttonWorkDest(dest,false);
+    }
+    void sendbuttonWorkDest(int dest, boolean isRs232){
         //get number of stored message
         //increase to 4 digits
-        Log.d(TAG,"sendbuttonWorkDest "+dest);
+        Log.d(TAG,"sendbuttonWorkDest "+dest+" to "+(isRs232?"RS232":"BT"));
         String t=Integer.toHexString(dest);
         if (t.length()==1)
             t="000"+t;
@@ -620,6 +654,10 @@ public class MainActivity extends AppCompatActivity {
             }
         }// */
         //log("Will sendCommand, length="+(cnt+esc_cnt));//+", chk="+chk);
+        if (isRs232){
+            sendCommandRs232(new TxStruct(stuffed, cnt+esc_cnt));
+            return;
+        }
         sendCommand(new TxStruct(stuffed, cnt+esc_cnt));
         counter_J1708_sent++;
         this.runOnUiThread(new Runnable() {
@@ -1004,7 +1042,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void parseMessage(byte[] buf, int len) {
-        log(false,buf,len);
+        log(false,buf,len,false);
         for (int i = 0; i < len; i++) {
             processCharFromBus(buf[i]);
         }
@@ -1166,7 +1204,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void sendCommand(TxStruct command) {
-        log(true,command.getBuf(),Math.min(command.getLen(),20));
+        log(true,command.getBuf(),Math.min(command.getLen(),20),false);
         boolean ok=false;
         ///*debug*/unsentDest=-1; ok=true;
         if (bluetoothSocket != null) {
@@ -1193,18 +1231,53 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    //RS232
+    private void sendCommandRs232(TxStruct command) {
+        log(true,command.getBuf(),Math.min(command.getLen(),20),true);
+        if (mSerialPort==null){
+            log("RS232 opening at COM1...");
+            try {
+                mSerialPort = new SerialPort(new File("/dev/ttymxc0"), 115200, 0);
+                mOutputStream = mSerialPort.getOutputStream();
+                mInputStream = mSerialPort.getInputStream();
+                mReadThread = new ReadThread();
+                mReadThread.start();
+                TimeUnit.MILLISECONDS.sleep(100);
+            } catch (Exception e) {
+                log("RS232 open error "+e);
+            }
+        }
+        if (mSerialPort!=null)
+            try {
+                mOutputStream.write(command.getBuf(),0,command.getLen());
+            } catch (IOException e) {
+                log("RS232 write error "+e);
+            }
+        else
+            log("RS232 is closed!");
+    }
+
+    //RS232
+    protected void onDataReceived(byte[] buffer, int size) {
+        log(false,buffer,size,true);
+    }
+
+
 
     void log(String text){
-        log(0,text);
+        log(0,text,false);
     }
     void log(boolean sent, String text){
-        log(sent?1:-1,text);
+        log(sent?1:-1,text,false);
     }
-    void log(final int sent, final String text){
+    void log(final boolean sent, final byte[] text){
+        log(sent,text,text.length,false);
+    }
+    void log(final int sent, final String text, final boolean isRs232){
         runOnUiThread(new Runnable() {
             public void run() {
                 String time111 = mSDF.format(new Date());
-                String ss=time111+" "+(sent!=0?(sent>0?"send":"rcvd")+":":"")+" "+text;
+                String ss=time111+" "+(sent!=0?(sent>0?"send":"rcvd")+(isRs232?" RS232":"")+":":"")+" "+text;
                 mReception.append(ss+"\n");
                 if (mReception.length() > 15000)
                     mReception.setText(mReception.getText().toString().substring(mReception.length() - 15000));
@@ -1212,11 +1285,11 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
-    void log(final boolean sent, final byte[] text, final int len){
+    void log(final boolean sent, final byte[] text, final int len, final boolean isRs232){
         runOnUiThread(new Runnable() {
             public void run() {
                 String time111 = mSDF.format(new Date());
-                String ss=time111+" "+(sent?"send":"rcvd")+": ";
+                String ss=time111+" "+(sent?"send":"rcvd")+(isRs232?" RS232":"")+": ";
                 for (int i = 0; i < len; i++) {
                     String h=Integer.toHexString((int)(text[i] & 0xFF));
                     if (h.length()==1)
@@ -1230,9 +1303,6 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG,ss);
             }
         });
-    }
-    void log(final boolean sent, final byte[] text){
-        log(sent,text,text.length);
     }
 
 
@@ -1420,6 +1490,30 @@ PGN (Parameter Group Number) — номер группы параметров, �
             return buf;
         }
     }
+
+
+    private class ReadThread extends Thread {
+
+        @Override
+        public void run() {
+            super.run();
+            while(!isInterrupted()) {
+                int size;
+                try {
+                    byte[] buffer = new byte[64];
+                    if (mInputStream == null) return;
+                    size = mInputStream.read(buffer);
+                    if (size > 0) {
+                        onDataReceived(buffer, size);
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    return;
+                }
+            }
+        }
+    }
+
 
     public boolean isOnline() {
         ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
