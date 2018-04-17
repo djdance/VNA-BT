@@ -20,6 +20,7 @@ import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Message;
+import android.preference.CheckBoxPreference;
 import android.preference.PreferenceManager;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
@@ -603,8 +604,18 @@ public class MainActivity extends AppCompatActivity {
     void sendbuttonWorkDest(int dest, boolean isRs232){
         //get number of stored message
         //increase to 4 digits
-        Log.d(TAG,"sendbuttonWorkDest "+dest+" to "+(isRs232?"RS232":"BT"));
-        String t=Integer.toHexString(dest);
+        boolean useHex=true;//((CheckBox)findViewById(R.id.useHex)).isChecked();
+        boolean sendAsPR=((CheckBox)findViewById(R.id.sendAsPR)).isChecked();
+        Log.d(TAG,"sendbuttonWorkDest "+dest+" to "+(isRs232?"RS232":"BT")+", HEX?"+useHex);
+        String t="0";
+        try {
+            if (useHex)
+                t=Integer.toHexString(dest).toUpperCase();
+            else
+                t=Integer.toString(dest);
+        } catch (Exception e) {
+            log("Wrong DEST value!");
+        }
         if (t.length()==1)
             t="000"+t;
         else if (t.length()==2)
@@ -615,44 +626,91 @@ public class MainActivity extends AppCompatActivity {
         byte[] message = new byte[14];
         byte[] stuffed = new byte[28];
         int cnt;
-
-        //j1708
-        message[3] = (byte) 0xBC;//MID
-        message[4] = (byte) 0xFF;//PID
-        message[5] = (byte) 0xF5;//PID
-        message[6] = (byte) 0x01;//priority, will be gone to the end after checksum
-        message[7] = (byte) 0x05;//len without this checksum
-        message[8] = (byte) 0x44;//D
-        message[9] = (byte) t.charAt(0);// (byte) 0x30;//0
-        message[10] = (byte) t.charAt(1);// (byte) 0x30;//0
-        message[11] = (byte) t.charAt(2);// (byte) 0x30;//0
-        message[12] = (byte) t.charAt(3);// (byte) (0x30+dest);//1+dest
-        //byte chk=(byte)cksum(message);
-        ////message[13] = chk;//checksum NO NEED for VNA! it add J1708 checksum itself! but leave it for rs485!
-
-        message[0] = 0;
-        message[1] = 12;//length with checksum
-        message[2] = (byte) TX_J1708; //VNA_MSG_TX_J1587  //0x08
-
-        message[13] = (byte) cksum(message);
-
-        // Tack on beginning of string marker
-        stuffed[0] = RS232_FLAG;
         int esc_cnt = 1;
-        // Bytestuff
-        for( cnt = 0; cnt < message.length; cnt++ ) {
-            if( message[cnt] == RS232_FLAG ) {
-                stuffed[cnt+esc_cnt] = RS232_ESCAPE;
-                esc_cnt++;
-                stuffed[cnt+esc_cnt] = RS232_ESCAPE_FLAG;
-            } else if( message[cnt] == RS232_ESCAPE ) {
-                stuffed[cnt+esc_cnt] = RS232_ESCAPE;
-                esc_cnt++;
-                stuffed[cnt+esc_cnt] = RS232_ESCAPE_ESCAPE;
-            } else{
-                stuffed[cnt+esc_cnt] = message[cnt];
+
+        if (!sendAsPR) {
+            //j1708
+            message[3] = (byte) 0xBC;//MID
+            message[4] = (byte) 0xFF;//PID
+            message[5] = (byte) 0xF5;//PID
+            message[6] = (byte) 0x01;//priority, will be gone to the end after checksum
+            message[7] = (byte) 0x05;//len without this checksum
+            message[8] = (byte) 0x44;//D
+            message[9] = (byte) t.charAt(0);// (byte) 0x30;//0
+            message[10] = (byte) t.charAt(1);// (byte) 0x30;//0
+            message[11] = (byte) t.charAt(2);// (byte) 0x30;//0
+            message[12] = (byte) t.charAt(3);// (byte) (0x30+dest);//1+dest
+            //byte chk=(byte)cksum(message);
+            ////message[13] = chk;//checksum NO NEED for VNA! it add J1708 checksum itself! but leave it for rs485!
+
+            message[0] = 0;
+            message[1] = 12;//length with checksum
+            message[2] = (byte) TX_J1708; //VNA_MSG_TX_J1587  //0x08
+
+            message[13] = (byte) cksum(message);
+
+            // Tack on beginning of string marker
+            stuffed[0] = RS232_FLAG;
+            // Bytestuff
+            for (cnt = 0; cnt < message.length; cnt++) {
+                if (message[cnt] == RS232_FLAG) {
+                    stuffed[cnt + esc_cnt] = RS232_ESCAPE;
+                    esc_cnt++;
+                    stuffed[cnt + esc_cnt] = RS232_ESCAPE_FLAG;
+                } else if (message[cnt] == RS232_ESCAPE) {
+                    stuffed[cnt + esc_cnt] = RS232_ESCAPE;
+                    esc_cnt++;
+                    stuffed[cnt + esc_cnt] = RS232_ESCAPE_ESCAPE;
+                } else {
+                    stuffed[cnt + esc_cnt] = message[cnt];
+                }
             }
-        }// */
+        } else {
+            //PR msg
+            /*//1.11 on page 11 of manual
+            message[3] = (byte) 0xBC;//MID
+            message[4] = (byte) 0xFE;//PID 254
+            message[5] = (byte) 0xBD;//Receiver MID 189
+            message[6] = (byte) 0x06;//data bytes to follow - len without this checksum
+            message[7] = (byte) 0x33;//51 Message type
+            message[8] = (byte) 0x10;//16 for all signs*/
+            //2.11 on page 28
+            message[3] = (byte) 0xBC;//MID
+            message[4] = (byte) 0xFF;//PID
+            message[5] = (byte) 0xF5;//PID
+            message[6] = (byte) 0x01;//priority, will be gone to the end after checksum
+            message[7] = (byte) 0x05;//len without this checksum
+            message[8] = (byte) 0x50;//P
+            message[9] = (byte) t.charAt(0);// (byte) 0x30;//0
+            message[10] = (byte) t.charAt(1);// (byte) 0x30;//0
+            message[11] = (byte) t.charAt(2);// (byte) 0x30;//0
+            message[12] = (byte) t.charAt(3);// (byte) (0x30+dest);//1+dest
+            //byte chk=(byte)cksum(message);
+            ////message[13] = chk;//checksum NO NEED for VNA! it add J1708 checksum itself! but leave it for rs485!
+
+            message[0] = 0;
+            message[1] = 12;//length with checksum
+            message[2] = (byte) TX_J1708; //VNA_MSG_TX_J1587  //0x08
+
+            message[13] = (byte) cksum(message);
+
+            // Tack on beginning of string marker
+            stuffed[0] = RS232_FLAG;
+            // Bytestuff
+            for (cnt = 0; cnt < message.length; cnt++) {
+                if (message[cnt] == RS232_FLAG) {
+                    stuffed[cnt + esc_cnt] = RS232_ESCAPE;
+                    esc_cnt++;
+                    stuffed[cnt + esc_cnt] = RS232_ESCAPE_FLAG;
+                } else if (message[cnt] == RS232_ESCAPE) {
+                    stuffed[cnt + esc_cnt] = RS232_ESCAPE;
+                    esc_cnt++;
+                    stuffed[cnt + esc_cnt] = RS232_ESCAPE_ESCAPE;
+                } else {
+                    stuffed[cnt + esc_cnt] = message[cnt];
+                }
+            }
+        }
         //log("Will sendCommand, length="+(cnt+esc_cnt));//+", chk="+chk);
         if (isRs232){
             sendCommandRs232(new TxStruct(stuffed, cnt+esc_cnt));

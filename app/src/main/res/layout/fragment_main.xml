@@ -230,6 +230,20 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Send RS232" />
+            <!--CheckBox
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/useHex"
+                android:checked="true"
+                android:text="HEX"
+                /-->
+            <CheckBox
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/sendAsPR"
+                android:checked="false"
+                android:text="as PR"
+                />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
