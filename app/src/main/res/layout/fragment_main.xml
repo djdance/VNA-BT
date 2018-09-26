@@ -230,13 +230,25 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Send RS232" />
-            <!--CheckBox
+            <Button
+                android:id="@+id/button_sendSerie"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Send 1..255" />
+            <CheckBox
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:id="@+id/useHex"
                 android:checked="true"
                 android:text="HEX"
-                /-->
+                />
+            <CheckBox
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/useDigit"
+                android:checked="false"
+                android:text="Digits"
+                />
             <CheckBox
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

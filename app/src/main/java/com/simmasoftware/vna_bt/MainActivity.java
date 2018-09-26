@@ -378,13 +378,34 @@ public class MainActivity extends AppCompatActivity {
         ((Button) findViewById(R.id.button_sendDestLast)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                ((Button)findViewById(R.id.button_sendDestLast)).setTag(true);
+                ((Button)findViewById(R.id.button_sendDestLastRs232)).setTag(null);
+                ((Button)findViewById(R.id.button_sendDestLast)).setTextColor(Color.RED);
+                ((Button)findViewById(R.id.button_sendDestLastRs232)).setTextColor(Color.BLACK);
                 sendbuttonWork(0);
             }
         });
         ((Button) findViewById(R.id.button_sendDestLastRs232)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                ((Button)findViewById(R.id.button_sendDestLast)).setTag(null);
+                ((Button)findViewById(R.id.button_sendDestLastRs232)).setTag(true);
+                ((Button)findViewById(R.id.button_sendDestLast)).setTextColor(Color.BLACK);
+                ((Button)findViewById(R.id.button_sendDestLastRs232)).setTextColor(Color.RED);
                 sendbuttonWork(0,true);
+            }
+        });
+        ((Button) findViewById(R.id.button_sendSerie)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (findViewById(R.id.button_sendSerie).getTag()==null) {
+                    ((Button) findViewById(R.id.button_sendSerie)).setTag(true);
+                    ((Button) findViewById(R.id.button_sendSerie)).setTextColor(Color.RED);
+                    sendSerie();
+                } else {
+                    ((Button) findViewById(R.id.button_sendSerie)).setTag(null);
+                    ((Button) findViewById(R.id.button_sendSerie)).setTextColor(Color.BLACK);
+                }
             }
         });
         initTextViews();//no need
@@ -411,6 +432,43 @@ public class MainActivity extends AppCompatActivity {
                     e.printStackTrace();
                 }
                 (new postlog(MainActivity.this)).sendlogs();
+            }
+        }).start();
+    }
+    void sendSerie(){
+        if (currDest>=255 || findViewById(R.id.button_sendSerie).getTag()==null) {
+            boolean cont=false;
+            if (findViewById(R.id.button_sendSerie).getTag()!=null){
+                if (((CheckBox)findViewById(R.id.useHex)).isChecked()){
+                    ((CheckBox)findViewById(R.id.useHex)).setChecked(false);
+                    currDest=0;
+                    cont=true;
+                } else if (!((CheckBox)findViewById(R.id.useDigit)).isChecked()){
+                    ((CheckBox)findViewById(R.id.useDigit)).setChecked(true);
+                    currDest=0;
+                    cont=true;
+                }
+            }
+            if (!cont) {
+                ((Button) findViewById(R.id.button_sendSerie)).setTag(null);
+                ((Button) findViewById(R.id.button_sendSerie)).setTextColor(Color.BLACK);
+                return;
+            }
+        }
+        sendbuttonWork(+1,findViewById(R.id.button_sendDestLastRs232).getTag()!=null);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                runOnUiThread(new Runnable() {
+                    public void run() {
+                        sendSerie();
+                    }
+                });
             }
         }).start();
     }
@@ -583,7 +641,7 @@ public class MainActivity extends AppCompatActivity {
     };
 
     void sendbuttonWork(int increment){
-     sendbuttonWork(increment,false);
+     sendbuttonWork(increment,findViewById(R.id.button_sendDestLastRs232).getTag()!=null);
     }
     void sendbuttonWork(int increment, boolean isRs232){
         if (currDest+increment>=0)
@@ -595,8 +653,10 @@ public class MainActivity extends AppCompatActivity {
         }
         if (currDest!=-1)
             unsentDest=currDest;
-        checkAndEnableBT(REQUEST_ACTION_REQUEST_ENABLE);
-        mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), 50);
+        if (!isRs232) {
+            checkAndEnableBT(REQUEST_ACTION_REQUEST_ENABLE);
+            mHandler.sendMessageDelayed(Message.obtain(mHandler, 1, ""), 50);
+        }
     }
     void sendbuttonWorkDest(int dest){
         sendbuttonWorkDest(dest,false);
@@ -604,7 +664,8 @@ public class MainActivity extends AppCompatActivity {
     void sendbuttonWorkDest(int dest, boolean isRs232){
         //get number of stored message
         //increase to 4 digits
-        boolean useHex=true;//((CheckBox)findViewById(R.id.useHex)).isChecked();
+        boolean useHex=((CheckBox)findViewById(R.id.useHex)).isChecked();
+        boolean useDigit=((CheckBox)findViewById(R.id.useDigit)).isChecked();
         boolean sendAsPR=((CheckBox)findViewById(R.id.sendAsPR)).isChecked();
         Log.d(TAG,"sendbuttonWorkDest "+dest+" to "+(isRs232?"RS232":"BT")+", HEX?"+useHex);
         String t="0";
@@ -636,10 +697,17 @@ public class MainActivity extends AppCompatActivity {
             message[6] = (byte) 0x01;//priority, will be gone to the end after checksum
             message[7] = (byte) 0x05;//len without this checksum
             message[8] = (byte) 0x44;//D
-            message[9] = (byte) t.charAt(0);// (byte) 0x30;//0
-            message[10] = (byte) t.charAt(1);// (byte) 0x30;//0
-            message[11] = (byte) t.charAt(2);// (byte) 0x30;//0
-            message[12] = (byte) t.charAt(3);// (byte) (0x30+dest);//1+dest
+            if (!useDigit) {
+                message[9] = (byte) t.charAt(0);// (byte) 0x30;//0
+                message[10] = (byte) t.charAt(1);// (byte) 0x30;//0
+                message[11] = (byte) t.charAt(2);// (byte) 0x30;//0
+                message[12] = (byte) t.charAt(3);// (byte) (0x30+dest);//1+dest
+            } else {
+                message[9] = 0;
+                message[10] = 0;
+                message[11] = 0;
+                message[12] = (byte) dest;
+            }
             //byte chk=(byte)cksum(message);
             ////message[13] = chk;//checksum NO NEED for VNA! it add J1708 checksum itself! but leave it for rs485!
 
@@ -665,6 +733,12 @@ public class MainActivity extends AppCompatActivity {
                     stuffed[cnt + esc_cnt] = message[cnt];
                 }
             }
+            /*
+            DEC: c0 00 0c 08 bc 55 5f 01 05 44 30 30 31 31 30
+            HEX: c0 00 0c 08 bc 55 5f 01 05 44 30 30 30 42 20
+            debug answer c0 00 03 00 08 f5
+             */
+
         } else {
             //PR msg
             /*//1.11 on page 11 of manual
